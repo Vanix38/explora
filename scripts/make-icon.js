@@ -1,19 +1,38 @@
-// Génère build/icon.ico (multi-tailles) et build/icon.png à partir du logo
-// assets/brand/icon-source.png (logo-fond-clair.png recadré dans un carré transparent).
+// Génère build/icon.ico (multi-tailles) et build/icon.png à partir du logo vectoriel
+// assets/brand/logo-fond-clair.svg, centré dans un carré transparent.
 // Usage : npm run icon
 const fs = require('fs');
 const path = require('path');
-const { app, nativeImage } = require('electron');
+const { app, BrowserWindow, nativeImage } = require('electron');
 
 const SIZES = [16, 24, 32, 48, 64, 128, 256];
+const MASTER = 512;
+const MARGIN = 0.03; // marge autour du logo, en fraction du côté
 const dir = path.join(__dirname, '..', 'build');
-const SOURCE = path.join(__dirname, '..', 'assets', 'brand', 'icon-source.png');
+const SOURCE = path.join(__dirname, '..', 'assets', 'brand', 'logo-fond-clair.svg');
 
-// Image maître de 512 px, réduite ensuite pour chaque taille
-function renderMaster() {
-  const img = nativeImage.createFromPath(SOURCE);
-  if (img.isEmpty()) throw new Error(`Logo introuvable : ${SOURCE}`);
-  return img.resize({ width: 512, height: 512, quality: 'best' });
+// Dessine le SVG dans un canvas (taille exacte, indépendante de l'échelle d'affichage)
+async function renderMaster() {
+  const svg = fs.readFileSync(SOURCE, 'utf8');
+  const [, , vw, vh] = svg.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
+  const win = new BrowserWindow({ show: false, webPreferences: { offscreen: true } });
+  await win.loadURL('about:blank');
+  const dataUrl = await win.webContents.executeJavaScript(`new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const S = ${MASTER}, inner = S * (1 - 2 * ${MARGIN});
+      const k = Math.min(inner / ${vw}, inner / ${vh});
+      const w = ${vw} * k, h = ${vh} * k;
+      const c = document.createElement('canvas'); c.width = c.height = S;
+      const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+      resolve(c.toDataURL('image/png'));
+    };
+    img.onerror = () => reject(new Error('SVG illisible'));
+    img.src = 'data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}';
+  })`);
+  win.destroy();
+  return nativeImage.createFromDataURL(dataUrl);
 }
 
 // ICO dont chaque image est un PNG (format accepté depuis Windows Vista)
@@ -42,7 +61,7 @@ function buildIco(pngs) {
 
 app.disableHardwareAcceleration();
 app.whenReady().then(async () => {
-  const master = renderMaster();
+  const master = await renderMaster();
   const pngs = SIZES.map((size) => ({ size, data: master.resize({ width: size, height: size, quality: 'best' }).toPNG() }));
   fs.writeFileSync(path.join(dir, 'icon.ico'), buildIco(pngs));
   fs.writeFileSync(path.join(dir, 'icon.png'), master.toPNG());
