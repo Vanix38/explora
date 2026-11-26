@@ -1,32 +1,19 @@
-// Génère build/icon.ico (multi-tailles) et build/icon.png à partir de build/icon.svg.
-// Usage : npx electron scripts/make-icon.js
+// Génère build/icon.ico (multi-tailles) et build/icon.png à partir du logo
+// assets/brand/icon-source.png (logo-fond-clair.png recadré dans un carré transparent).
+// Usage : npm run icon
 const fs = require('fs');
 const path = require('path');
-const { app, BrowserWindow } = require('electron');
+const { app, nativeImage } = require('electron');
 
 const SIZES = [16, 24, 32, 48, 64, 128, 256];
 const dir = path.join(__dirname, '..', 'build');
-const svg = fs.readFileSync(path.join(dir, 'icon.svg'), 'utf8');
+const SOURCE = path.join(__dirname, '..', 'assets', 'brand', 'icon-source.png');
 
-// Rendu unique en 512 px, puis réduction pour chaque taille
-async function renderMaster() {
-  const size = 512;
-  const win = new BrowserWindow({
-    show: false, width: size, height: size, useContentSize: true, transparent: true, frame: false,
-    webPreferences: { offscreen: true },
-  });
-  win.webContents.setZoomFactor(1);
-  const html = `<html><body style="margin:0;background:transparent">
-    <img src="data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}" width="${size}" height="${size}" style="display:block"></body></html>`;
-  const file = path.join(app.getPath('temp'), 'explora-icon.html');
-  fs.writeFileSync(file, html);
-  await win.loadFile(file);
-  await new Promise((r) => setTimeout(r, 500));
-  let img = await win.webContents.capturePage({ x: 0, y: 0, width: size, height: size });
-  if (img.getSize().width !== size) img = img.resize({ width: size, height: size, quality: 'best' });
-  win.destroy();
-  fs.unlinkSync(file);
-  return img;
+// Image maître de 512 px, réduite ensuite pour chaque taille
+function renderMaster() {
+  const img = nativeImage.createFromPath(SOURCE);
+  if (img.isEmpty()) throw new Error(`Logo introuvable : ${SOURCE}`);
+  return img.resize({ width: 512, height: 512, quality: 'best' });
 }
 
 // ICO dont chaque image est un PNG (format accepté depuis Windows Vista)
@@ -55,7 +42,7 @@ function buildIco(pngs) {
 
 app.disableHardwareAcceleration();
 app.whenReady().then(async () => {
-  const master = await renderMaster();
+  const master = renderMaster();
   const pngs = SIZES.map((size) => ({ size, data: master.resize({ width: size, height: size, quality: 'best' }).toPNG() }));
   fs.writeFileSync(path.join(dir, 'icon.ico'), buildIco(pngs));
   fs.writeFileSync(path.join(dir, 'icon.png'), master.toPNG());
