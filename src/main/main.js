@@ -12,6 +12,7 @@ const adblock = require('./adblock');
 const resend = require('./resend');
 const mcp = require('./mcp');
 const googleLogin = require('./google-login');
+const passkeys = require('./passkeys');
 
 const mail = require('./mail');
 
@@ -37,6 +38,8 @@ app.userAgentFallback = app.userAgentFallback
   .replace(/\sExplora\/\S+/gi, '');
 // Pages de connexion Google : user-agent Firefox (voir google-login.js).
 googleLogin.init();
+// Clés d'accès : pas de fenêtre Windows Hello en boucle (voir passkeys.js).
+passkeys.init();
 
 internal.registerScheme([resend.schemePrivileges]);
 
