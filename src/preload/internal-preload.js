@@ -16,6 +16,7 @@ if (location.protocol === 'explora:') {
     setTheme: (theme) => call('set-theme', theme),
     setRestoreTabs: (on) => call('set-restore-tabs', on),
     setFavorites: (list) => call('set-favorites', list),
+    setSearchSuggestions: (on) => call('set-search-suggestions', on),
     clearBrowsingData: () => call('clear-browsing-data'),
     newPrivateWindow: () => call('new-private-window'),
     // recherche depuis la page d'accueil (newTab : ouvrir dans un nouvel onglet)

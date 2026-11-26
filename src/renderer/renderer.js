@@ -227,7 +227,10 @@ function render() {
 window.nav.onState((s) => {
   const switched = s.activeId !== state.activeId;
   state = s;
-  if (switched) addressDirty = false;
+  if (switched) {
+    addressDirty = false;
+    hideSuggestions();
+  }
   render();
 });
 
@@ -300,23 +303,220 @@ reloadBtn.addEventListener('click', () => {
   else window.nav.reload();
 });
 
-address.addEventListener('input', () => { addressDirty = true; });
 address.addEventListener('focus', () => address.select());
+
+// --- Autocomplétion de la barre d'adresse (comme Chrome) ---
+// Pendant la frappe : la saisie elle-même, des pages de l'historique et les
+// suggestions du moteur actif, dans une liste sous la barre. ↑/↓ parcourent
+// la liste (la barre affiche la ligne choisie), Entrée l'ouvre, Échap revient
+// à la saisie. Le début d'une adresse déjà visitée est complété directement
+// dans la barre (texte ajouté sélectionné : il suffit de continuer à taper).
+const MAX_SUGGESTIONS = 10;
+const ac = {
+  typed: '', // ce que l'utilisateur a réellement tapé
+  first: '', // la saisie + la complétion en ligne (ce qu'ouvre Entrée)
+  history: [],
+  remote: [],
+  items: [],
+  selected: 0,
+  open: false,
+  seq: 0,
+  remoteTimer: null,
+  hideTimer: null,
+};
+
+// Même règle que resolveInput (src/main/search.js) : adresse ou recherche ?
+function looksLikeUrl(text) {
+  if (/^(https?|file|about|view-source|explora|customnav):/i.test(text)) return true;
+  if (/\s/.test(text)) return false;
+  if (/^localhost(:\d+)?(\/.*)?$/i.test(text)) return true;
+  if (/^\d{1,3}(\.\d{1,3}){3}(:\d+)?(\/.*)?$/.test(text)) return true;
+  return /^[^\s/]+\.[a-z]{2,}(:\d+)?(\/.*)?$/i.test(text);
+}
+
+const bareUrl = (url) => url.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '').toLowerCase();
+
+function buildSuggestions() {
+  const prevFill = ac.items[ac.selected]?.fill;
+  const first = ac.first.trim();
+  const items = [];
+  if (looksLikeUrl(first)) {
+    items.push({ kind: 'url', url: first, fill: ac.first });
+  } else {
+    const eng = engines.engines.find((x) => x.id === engines.activeId);
+    items.push({
+      kind: 'search',
+      text: first,
+      fill: ac.first,
+      icon: eng?.icon,
+      hint: eng ? `${eng.type === 'ai' ? 'Demander à' : 'Rechercher sur'} ${eng.name}` : '',
+    });
+  }
+  const seen = new Set([bareUrl(first)]);
+  for (const h of ac.history) {
+    const key = bareUrl(h.url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push({ kind: 'url', url: h.url, title: h.title, fill: h.url });
+  }
+  const seenText = new Set([first.toLowerCase()]);
+  for (const text of ac.remote) {
+    if (items.length >= MAX_SUGGESTIONS) break;
+    if (seenText.has(text.toLowerCase())) continue;
+    seenText.add(text.toLowerCase());
+    items.push({ kind: 'search', text, fill: text });
+  }
+  ac.items = items;
+  // les suggestions du moteur arrivent après coup : la ligne choisie au
+  // clavier reste choisie même si elle a changé de place
+  if (ac.selected > 0) ac.selected = Math.max(0, items.findIndex((i) => i.fill === prevFill));
+}
+
+function showSuggestions() {
+  if (!ac.typed || document.activeElement !== address) {
+    hideSuggestions();
+    return;
+  }
+  clearTimeout(ac.hideTimer);
+  buildSuggestions();
+  const r = address.getBoundingClientRect();
+  ac.open = true;
+  window.nav.showSuggestions({
+    rect: { x: r.left, y: r.bottom + 4, width: r.width },
+    // seuls les champs utiles à l'affichage
+    items: ac.items.map(({ fill, ...item }) => item),
+    selected: ac.selected,
+    typed: ac.typed,
+  });
+}
+
+function hideSuggestions() {
+  clearTimeout(ac.hideTimer);
+  clearTimeout(ac.remoteTimer);
+  ac.seq++; // les réponses encore en route sont ignorées
+  if (!ac.open) return;
+  ac.open = false;
+  window.nav.hideSuggestions();
+}
+
+// La saisie a changé : complétion en ligne + suggestions (historique tout de
+// suite, moteur de recherche après une courte pause dans la frappe)
+async function updateSuggestions(allowInline) {
+  const typed = address.value;
+  ac.typed = typed.trim() ? typed : '';
+  ac.first = typed;
+  ac.selected = 0;
+  if (!ac.typed) {
+    ac.history = [];
+    ac.remote = [];
+    hideSuggestions();
+    return;
+  }
+  const seq = ++ac.seq;
+  clearTimeout(ac.remoteTimer);
+  ac.remoteTimer = setTimeout(async () => {
+    const list = await window.nav.suggestRemote(typed).catch(() => []);
+    if (seq !== ac.seq) return;
+    ac.remote = Array.isArray(list) ? list : [];
+    showSuggestions();
+  }, 120);
+
+  const local = await window.nav.suggestLocal(typed).catch(() => null);
+  if (seq !== ac.seq || address.value !== typed) return;
+  ac.history = local?.entries || [];
+  const inline = local?.inline;
+  const caretAtEnd = address.selectionStart === typed.length && address.selectionEnd === typed.length;
+  if (allowInline && caretAtEnd && inline && inline.length > typed.length
+      && inline.toLowerCase().startsWith(typed.toLowerCase())) {
+    // dans le chemin, la casse compte (ex. github.com/Vanix38) : on reprend
+    // celle de l'adresse visitée ; dans le nom de domaine, celle de la saisie
+    address.value = inline.includes('/') ? inline : typed + inline.slice(typed.length);
+    address.setSelectionRange(typed.length, address.value.length);
+    ac.first = address.value;
+  }
+  // les suggestions du moteur pour la saisie précédente restent affichées
+  // (si elles correspondent encore) jusqu'à l'arrivée des nouvelles
+  const t = typed.trim().toLowerCase();
+  ac.remote = ac.remote.filter((s) => s.toLowerCase().startsWith(t));
+  showSuggestions();
+}
+
+address.addEventListener('input', (e) => {
+  addressDirty = true;
+  // pas de complétion en ligne quand on efface (sinon impossible d'effacer)
+  const allowInline = !e.isComposing && !/^delete/.test(e.inputType || '');
+  updateSuggestions(allowInline);
+});
+
+function moveSelection(delta) {
+  const n = ac.items.length;
+  if (!n) return;
+  ac.selected = (ac.selected + delta + n) % n;
+  address.value = ac.items[ac.selected].fill;
+  if (ac.selected === 0 && ac.first !== ac.typed) {
+    // retour à la saisie : la complétion en ligne redevient sélectionnée
+    address.setSelectionRange(ac.typed.length, address.value.length);
+  } else {
+    address.setSelectionRange(address.value.length, address.value.length);
+  }
+  showSuggestions();
+}
+
+function openInput(value, inNewTab) {
+  value = value.trim();
+  if (!value) return;
+  hideSuggestions();
+  addressDirty = false;
+  address.blur();
+  if (inNewTab) window.nav.newTab(value);
+  else window.nav.go(value);
+}
+
 address.addEventListener('keydown', (e) => {
+  if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.altKey) {
+    e.preventDefault();
+    if (ac.open) moveSelection(e.key === 'ArrowDown' ? 1 : -1);
+    else if (addressDirty && address.value.trim()) updateSuggestions(false);
+    return;
+  }
+  if (e.key === 'Enter' && e.altKey) {
+    // Alt+Entrée : dans un nouvel onglet
+    e.preventDefault();
+    openInput(address.value, true);
+    return;
+  }
   if (e.key === 'Escape') {
+    if (ac.open && ac.selected !== 0) {
+      moveSelection(-ac.selected); // revient à la saisie, liste ouverte
+      return;
+    }
+    if (ac.open) {
+      hideSuggestions();
+      return;
+    }
     addressDirty = false;
     render();
     address.blur();
   }
 });
 
+// Un clic dans la liste fait perdre le focus à la barre juste avant que le
+// clic n'arrive : on laisse un instant avant de fermer la liste
+address.addEventListener('blur', () => {
+  clearTimeout(ac.hideTimer);
+  ac.hideTimer = setTimeout(hideSuggestions, 150);
+});
+window.addEventListener('resize', hideSuggestions);
+
+window.nav.onSuggestionPick(({ index, newTab: inNewTab }) => {
+  const item = ac.items[index];
+  if (!item) return;
+  openInput(item.kind === 'url' ? item.url : item.text, inNewTab);
+});
+
 $('address-form').addEventListener('submit', (e) => {
   e.preventDefault();
-  const value = address.value.trim();
-  if (!value) return;
-  addressDirty = false;
-  address.blur();
-  window.nav.go(value);
+  openInput(address.value, false);
 });
 
 window.nav.getState().then((s) => { if (s) { state = s; render(); } });
@@ -392,7 +592,15 @@ function resend(engineId) {
   window.nav.resendTo(engineId, text);
 }
 
-window.nav.onEngines((s) => { engines = s; renderEngines(); });
+window.nav.onEngines((s) => {
+  engines = s;
+  renderEngines();
+  // nouveau moteur actif : ses suggestions à lui
+  if (ac.open) {
+    ac.remote = [];
+    updateSuggestions(false);
+  }
+});
 window.nav.onResendShortcut((id) => resend(id));
 window.nav.getEngines().then((s) => { engines = s; renderEngines(); });
 

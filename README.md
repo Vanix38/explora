@@ -58,6 +58,12 @@ npm start
   onglet : recharger, dupliquer, fermer, fermer les autres onglets / ceux à droite / ceux à gauche
 - Boutons précédent / suivant / recharger (devient « arrêter » pendant le chargement)
 - Barre d'adresse : une URL (`github.com`, `https://…`, `localhost:3000`) ou du texte → recherche avec le moteur / l'IA actif
+- Autocomplétion comme Chrome : pendant la frappe, une liste propose la saisie, des pages de l'historique et les
+  suggestions du moteur actif (Google, DuckDuckGo, Bing, YouTube, Wikipédia, Qwant, Ecosia ; suggestions Google pour
+  les IA). `↑` / `↓` pour choisir, `Entrée` pour ouvrir, `Alt+Entrée` dans un nouvel onglet, `Échap` pour revenir à
+  la saisie ; clic molette ou `Ctrl+clic` sur une ligne : nouvel onglet. Le début d'une adresse déjà visitée est
+  complété directement dans la barre (`yo` → `youtube.com`). Les suggestions en ligne se coupent dans les réglages ;
+  pas d'historique proposé en navigation privée
 - Les liens `target=_blank` et `window.open` s'ouvrent dans un nouvel onglet
 - Connexions conservées entre les lancements (session persistante `persist:main`)
 - Page d'accueil interne pour les nouveaux onglets : grande barre de recherche, pastilles moteurs / IA et raccourcis
@@ -337,6 +343,7 @@ utilisateur de l'app (`%APPDATA%\Explora\settings.json`).
 | `Ctrl+W` | Fermer l'onglet (dans une messagerie : refermer son panneau) |
 | `Ctrl+Shift+M` | Masquer / afficher la barre latérale |
 | `Ctrl+L` | Aller à la barre d'adresse |
+| `↑` / `↓`, `Alt+Entrée` | Parcourir les suggestions, ouvrir dans un nouvel onglet |
 | `Ctrl+,` | Réglages |
 | `Ctrl+H` | Historique |
 | `Ctrl+Shift+E` | Courrier |
