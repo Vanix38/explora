@@ -9,7 +9,10 @@
 // en Firefox, uniquement sur les pages de connexion Google : Google n'y fait
 // alors pas les vérifications propres à Chrome. Le reste de la navigation
 // garde l'user-agent Chrome normal.
+const path = require('path');
 const { app } = require('electron');
+
+const PRELOAD = path.join(__dirname, '..', 'preload', 'google-login-preload.js');
 
 const FIREFOX_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:150.0) Gecko/20100101 Firefox/150.0';
 
@@ -37,6 +40,8 @@ function patchSession(ses) {
     headers['User-Agent'] = FIREFOX_UA;
     callback({ requestHeaders: headers });
   });
+  // Clés d'accès : évite la fenêtre Windows Hello en boucle (voir le preload).
+  ses.registerPreloadScript({ type: 'frame', filePath: PRELOAD });
 }
 
 // Page : navigator.userAgent doit lui aussi annoncer Firefox, sinon Google voit
