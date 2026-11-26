@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="115 -15 790 700" role="img" aria-label="Explora">
+  <defs>
+    <linearGradient id="ecr" x1="0.9" y1="0.05" x2="0.2" y2="0.95"><stop offset="0" stop-color="#5b78ff"/><stop offset="1" stop-color="#2a36cf"/></linearGradient>
+    <linearGradient id="ecw" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a68ff"/><stop offset="1" stop-color="#3540dc"/></linearGradient>
+    <linearGradient id="ecb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2f3bd2"/><stop offset="1" stop-color="#4a62f5"/></linearGradient>
+    <linearGradient id="ecn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8796ff"/><stop offset="1" stop-color="#4350ec"/></linearGradient>
+    <linearGradient id="ecs" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9aa2b8"/><stop offset="1" stop-color="#5d6780"/></linearGradient>
+  </defs>
+  <g id="ec-icon">
+    <path d="M236 415 C160 468 118 540 172 588 C230 632 330 646 440 648 C330 630 232 606 202 562 C176 522 196 470 238 440 Z" fill="url(#ecw)"/>
+    <path d="M836 233 A298 298 0 1 0 836 457" fill="none" stroke="url(#ecr)" stroke-width="64"/>
+    <path d="M684 318 H862 Q878 318 878 334 V365 Q878 381 862 381 H650 Z" fill="url(#ecb)"/>
+    <path d="M572 108 L600 226 L534 256 Z" fill="url(#ecs)"/><path d="M310 353 L468 318 L442 382 Z" fill="url(#ecs)"/><path d="M555 590 L527 462 L588 436 Z" fill="url(#ecs)"/><path d="M410 220 L512 268 L476 303 Z" fill="url(#ecs)"/><path d="M692 482 L598 430 L632 398 Z" fill="url(#ecs)"/>
+    <path d="M718 186 Q718 186 716 192 L617 392 Q612 402 602 408 L408 503 Q398 508 402 499 L503 300 Q508 290 518 285 Z" fill="url(#ecn)"/>
+    <path d="M718 186 L503 300 L402 499 Z" fill="#ffffff" opacity="0.14"/>
+    <circle cx="560" cy="347" r="32" fill="#16161d"/>
+  </g>
+</svg>
