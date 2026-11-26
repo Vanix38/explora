@@ -12,6 +12,8 @@ const adblock = require('./adblock');
 const resend = require('./resend');
 const mcp = require('./mcp');
 const translation = require('./translation');
+const suggest = require('./suggest');
+const { SuggestPopup } = require('./suggest-popup');
 const googleLogin = require('./google-login');
 const passkeys = require('./passkeys');
 
@@ -420,7 +422,9 @@ function createWindow({ isPrivate = false, restore = true } = {}) {
   });
   adblock.addSession(session.fromPartition(partition)); // pubs bloquées aussi en privé
   resend.addSession(session.fromPartition(partition)); // onglet « Renvoyer » des DevTools
-  const ctx = { win, tabs, isPrivate, partition };
+  // liste de suggestions sous la barre d'adresse
+  const suggestPopup = new SuggestPopup(win, { isPrivate });
+  const ctx = { win, tabs, isPrivate, partition, suggestPopup };
   windows.add(ctx);
   if (!isPrivate) mainCtx = ctx;
 
@@ -464,6 +468,7 @@ function createWindow({ isPrivate = false, restore = true } = {}) {
 
   if (!isPrivate) win.on('close', saveSessionNow);
   win.on('closed', () => {
+    suggestPopup.destroy();
     windows.delete(ctx);
     if (mainCtx === ctx) mainCtx = null;
     if (isPrivate) {
@@ -612,6 +617,24 @@ ipcMain.on('split:resize-start', fromUi(({ tabs }, index) => {
 ipcMain.on('split:reset', fromUi(({ tabs }) => tabs.resetSplitSizes()));
 ipcMain.handle('split:get-layout', fromUi(({ tabs }) => tabs.splitLayout));
 ipcMain.on('nav:go', fromUi(({ tabs }, input) => tabs.navigate(resolveInput(input, activeEngineId()))));
+// --- Suggestions de la barre d'adresse ---
+// Historique : jamais en navigation privée (comme Chrome)
+ipcMain.handle('suggest:local', fromUi((ctx, text) => (
+  ctx.isPrivate ? { entries: [], inline: null } : history.suggest(String(text || '').slice(0, 300), 4)
+)));
+ipcMain.handle('suggest:remote', fromUi((_ctx, text) => (
+  config.getConfig().searchSuggestions ? suggest.fetchSuggestions(getEngine(activeEngineId()), String(text || '')) : []
+)));
+ipcMain.on('suggest:show', fromUi((ctx, data) => ctx.suggestPopup.show(data)));
+ipcMain.on('suggest:hide', fromUi((ctx) => ctx.suggestPopup.hide()));
+// clic dans la liste : l'interface sait ce que contient la ligne
+ipcMain.on('suggest-popup:pick', (event, index, newTab) => {
+  for (const ctx of windows) {
+    if (event.sender !== ctx.suggestPopup.webContents) continue;
+    ctx.suggestPopup.hide();
+    if (Number.isInteger(index)) sendToUi(ctx, 'suggest:pick', { index, newTab: !!newTab });
+  }
+});
 ipcMain.on('nav:back', fromUi(({ tabs }) => tabs.goBack()));
 ipcMain.on('nav:forward', fromUi(({ tabs }) => tabs.goForward()));
 ipcMain.on('nav:reload', fromUi(({ tabs }) => tabs.reload()));
@@ -753,6 +776,7 @@ const INTERNAL_ACTIONS = {
     return r;
   },
   'set-favorites': (list) => config.setFavorites(list),
+  'set-search-suggestions': (on) => config.setSearchSuggestions(on),
   'history-list': (opts) => history.list(opts || {}),
   'history-remove': (ids) => history.remove(ids),
   'history-clear': (range) => history.clear(range),
@@ -800,7 +824,7 @@ const INTERNAL_ACTIONS = {
     return { ok: true };
   },
 };
-const CHANGES_CONFIG = new Set(['set-engines', 'reset-engines', 'set-active-engine', 'set-homepage', 'set-theme', 'set-restore-tabs', 'set-favorites']);
+const CHANGES_CONFIG = new Set(['set-engines', 'reset-engines', 'set-active-engine', 'set-homepage', 'set-theme', 'set-restore-tabs', 'set-favorites', 'set-search-suggestions']);
 
 ipcMain.handle('internal', async (event, action, ...args) => {
   const ctx = ctxFor(event.sender);

@@ -62,6 +62,13 @@ contextBridge.exposeInMainWorld('nav', {
   bookmarkOverflowMenu: (ids, x, y) => ipcRenderer.send('bookmarks:overflow-menu', ids, x, y),
   bookmarkContextMenu: (id, x, y) => ipcRenderer.send('bookmarks:context-menu', id, x, y),
 
+  // suggestions de la barre d'adresse
+  suggestLocal: (text) => ipcRenderer.invoke('suggest:local', text),
+  suggestRemote: (text) => ipcRenderer.invoke('suggest:remote', text),
+  showSuggestions: (data) => ipcRenderer.send('suggest:show', data),
+  hideSuggestions: () => ipcRenderer.send('suggest:hide'),
+  onSuggestionPick: (cb) => ipcRenderer.on('suggest:pick', (_e, pick) => cb(pick)),
+
   resendTo: (id, fallbackQuery) => ipcRenderer.send('engines:resend', id, fallbackQuery),
   onResendShortcut: (cb) => ipcRenderer.on('ui:resend', (_e, id) => cb(id)),
 });

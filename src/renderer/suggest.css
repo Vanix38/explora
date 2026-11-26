@@ -1,0 +1,107 @@
+/* Liste de suggestions de la barre d'adresse.
+   Hauteurs liées à src/main/suggest-popup.js : ROW_HEIGHT (34px),
+   LIST_PADDING (6px), bordure 1px, SIDE_MARGIN (10px), BOTTOM_MARGIN (14px). */
+:root {
+  --bg: #2a2c33;
+  --fg: #e6e7eb;
+  --fg-dim: #9a9ca5;
+  --accent: #7c8cff;
+  --selected: #3d404a;
+  --hover: #34363e;
+  --border: #3a3d46;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--fg);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --fg: #1d1e22;
+    --fg-dim: #5f626c;
+    --accent: #4f5fe0;
+    --selected: #e3e6f3;
+    --hover: #f0f1f5;
+    --border: #d5d8de;
+  }
+}
+
+:root.private {
+  --bg: #2f2742;
+  --selected: #4a3d66;
+  --hover: #3a3051;
+  --border: #4e4268;
+  --accent: #b18cff;
+}
+
+@media (prefers-color-scheme: light) {
+  :root.private {
+    --bg: #ffffff;
+    --selected: #e6e0f5;
+    --hover: #f1edf9;
+    --border: #d6cdee;
+    --accent: #7349d6;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+}
+
+body { padding: 0 10px 14px; }
+
+#list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 14px;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.row:hover { background: var(--hover); }
+.row.selected { background: var(--selected); box-shadow: inset 3px 0 0 var(--accent); }
+
+.icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--fg-dim);
+  border-radius: 3px;
+}
+
+.main {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.main b { font-weight: 600; }
+
+.hint {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg-dim);
+}
+
+.row.url .hint { color: var(--accent); }

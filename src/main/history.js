@@ -134,4 +134,69 @@ function clear(range = 'all') {
   return { removed: before - entries.length };
 }
 
-module.exports = { addVisit, setTitle, list, remove, clear, saveNow };
+// --- Suggestions de la barre d'adresse ---
+// Adresse sans « https:// » ni « www. » : c'est ce que l'on compare à la saisie
+const bare = (url) => url.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+
+// Pages de l'historique qui correspondent à `query` (tous les mots dans le
+// titre ou l'adresse), les plus utiles d'abord : visites fréquentes et
+// récentes, adresse qui commence par la saisie. Renvoie aussi `inline` : le
+// texte qui complète la saisie directement dans la barre (ex. « yo » ->
+// « youtube.com »), ou null.
+function suggest(query, limit = 5) {
+  load();
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return { entries: [], inline: null };
+  const words = q.split(/\s+/).filter(Boolean);
+  const now = Date.now();
+  const pages = new Map(); // url -> { url, title, visits, time }
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    let p = pages.get(e.url);
+    if (!p) {
+      const hay = `${e.title} ${e.url}`.toLowerCase();
+      if (!words.every((w) => hay.includes(w))) continue;
+      p = { url: e.url, title: e.title, visits: 0, time: e.time };
+      pages.set(e.url, p);
+    }
+    p.visits++;
+    if (!p.title && e.title) p.title = e.title;
+  }
+  // complétion en ligne : seulement si la saisie ressemble au début d'une adresse
+  const completions = new Map(); // texte complété -> score
+  const score = (p) => {
+    const ageDays = (now - p.time) / 86400e3;
+    let s = Math.log2(1 + p.visits) * 10 + Math.max(0, 30 - ageDays);
+    const b = bare(p.url).toLowerCase();
+    if (b.startsWith(q)) s += 40;
+    else if (p.title.toLowerCase().startsWith(q)) s += 15;
+    // une page d'accueil de site vaut mieux qu'une page profonde
+    if (/^[^/]+\/?$/.test(b)) s += 10;
+    return s;
+  };
+  for (const p of pages.values()) {
+    p.score = score(p);
+    if (/\s/.test(q)) continue;
+    const b = bare(p.url);
+    if (!b.toLowerCase().startsWith(q)) continue;
+    const host = b.split(/[/?#]/)[0];
+    let text;
+    if (q.length <= host.length) text = host;
+    else {
+      // dans le chemin : on complète jusqu'au prochain « / »
+      const cut = b.indexOf('/', q.length + 1);
+      text = (cut === -1 ? b : b.slice(0, cut)).replace(/\/$/, '');
+    }
+    completions.set(text, (completions.get(text) || 0) + p.score);
+  }
+  let inline = null;
+  for (const [text, s] of completions) if (!inline || s > inline.score) inline = { text, score: s };
+  const max = Math.min(Math.max(1, Number(limit) || 5), 20);
+  const best = [...pages.values()].sort((a, b) => b.score - a.score).slice(0, max);
+  return {
+    entries: best.map(({ url, title }) => ({ url, title })),
+    inline: inline ? inline.text : null,
+  };
+}
+
+module.exports = { addVisit, setTitle, list, remove, clear, saveNow, suggest };
