@@ -35,8 +35,11 @@ npm run dist
 Résultat : `dist/Explora-Setup-<version>.exe` (NSIS, Windows x64, via
 [electron-builder](https://www.electron.build/)). Le dossier `dist/` n'est pas versionné.
 
-L'icône est générée depuis `build/icon.svg` : après l'avoir modifiée, `npm run icon` régénère
-`build/icon.ico` (multi-tailles) et `build/icon.png`.
+Les logos sources sont dans `assets/brand/` (versions fond clair / fond sombre, avec ou sans le
+texte « Explora »). L'icône de l'app est générée depuis `assets/brand/icon-source.png` (le logo
+fond clair recadré en carré) : après l'avoir modifiée, `npm run icon` régénère `build/icon.ico`
+(multi-tailles) et `build/icon.png`. La page d'accueil affiche `src/internal/img/logo-full-*.png`
+(copies allégées des logos complets) selon le thème clair ou sombre.
 
 ## Lancer depuis les sources
 
@@ -372,7 +375,9 @@ src/
     messengers.html, .css, .js            barre des messageries
   internal/
     home.*, settings.*, bookmarks.*, extensions.*, mail.*, common.css   pages internes
-build/        icône (icon.svg source, icon.ico, icon.png)
+    img/                                  logos de la page d'accueil
+assets/brand/ logos sources (PNG transparents) et icon-source.png
+build/        icône de l'app (icon.ico, icon.png)
 scripts/      make-icon.js (génération de l'icône)
 ```
 
