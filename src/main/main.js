@@ -13,6 +13,8 @@ const resend = require('./resend');
 const mcp = require('./mcp');
 const suggest = require('./suggest');
 const { SuggestPopup } = require('./suggest-popup');
+const googleLogin = require('./google-login');
+const passkeys = require('./passkeys');
 
 const mail = require('./mail');
 
@@ -36,6 +38,10 @@ const APP_ICON = path.join(__dirname, '..', '..', 'build', 'icon.ico');
 app.userAgentFallback = app.userAgentFallback
   .replace(/\sElectron\/\S+/, '')
   .replace(/\sExplora\/\S+/gi, '');
+// Pages de connexion Google : user-agent Firefox (voir google-login.js).
+googleLogin.init();
+// Clés d'accès : pas de fenêtre Windows Hello en boucle (voir passkeys.js).
+passkeys.init();
 
 internal.registerScheme([resend.schemePrivileges]);
 
