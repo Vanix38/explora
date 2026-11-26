@@ -222,6 +222,7 @@ function render() {
   splitBtn.title = state.split ? "Fermer l'écran partagé (Ctrl+Shift+S)" : 'Écran partagé : ouvrir un onglet à côté (Ctrl+Shift+S)';
   renderStar(); // appelé après le chargement du script (événements IPC)
   renderAdblock();
+  renderTranslate();
 }
 
 window.nav.onState((s) => {
@@ -767,6 +768,37 @@ adBtn.addEventListener('click', () => {
 });
 window.nav.onAdblock((s) => { adblock = s; renderAdblock(); });
 window.nav.getAdblock().then((s) => { if (s) { adblock = s; renderAdblock(); } });
+
+// --- Traduction de la page : bouton dans la barre d'adresse ---
+// Visible quand la page est dans une autre langue que celle choisie, ou
+// pendant / après une traduction. Le clic ouvre le menu (natif) de traduction.
+const trBtn = $('translate');
+const trProgress = $('translate-progress');
+const translations = new Map(); // id d'onglet -> état envoyé par le processus principal
+
+function renderTranslate() {
+  for (const id of translations.keys()) if (!state.tabs.some((t) => t.id === id)) translations.delete(id);
+  const tr = translations.get(state.activeId);
+  const active = state.tabs.find((t) => t.id === state.activeId);
+  const web = /^https?:/.test(active?.url || '');
+  const status = tr?.status || 'idle';
+  trBtn.hidden = !web || !tr || (status === 'idle' && !tr.offer);
+  trBtn.className = `icon-btn ${status}`;
+  trBtn.title = tr?.title || 'Traduire la page';
+  const busy = status === 'downloading' || status === 'translating';
+  trProgress.hidden = !busy || tr.progress == null;
+  if (busy && tr.progress != null) trProgress.textContent = `${Math.round(tr.progress * 100)}`;
+}
+
+trBtn.addEventListener('mousedown', (e) => e.preventDefault());
+trBtn.addEventListener('click', () => {
+  const r = trBtn.getBoundingClientRect();
+  window.nav.translateMenu(r.left, r.bottom);
+});
+window.nav.onTranslate(({ tabId, ...tr }) => {
+  translations.set(tabId, tr);
+  if (tabId === state.activeId) renderTranslate();
+});
 
 // La zone des pages commence sous l'interface : on transmet sa hauteur réelle
 const chromeEl = $('chrome');

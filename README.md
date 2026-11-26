@@ -152,6 +152,32 @@ listes EasyList, EasyPrivacy, filtres uBlock Origin, Peter Lowe et Liste FR :
 Limites : certains sites détectent les bloqueurs et demandent de les désactiver ; les pubs YouTube
 dépendent de scripts que YouTube change souvent, le blocage peut y être imparfait.
 
+### Traduction des pages (locale, sans Google)
+
+Traduction intégrée avec [Bergamot](https://browser.mt/), le moteur de **Firefox Translations**
+(`@browsermt/bergamot-translator`, licence MPL-2.0) : le texte est traduit **sur le PC**, rien n'est envoyé à
+un service en ligne. Seuls les modèles de langue sont téléchargés une fois (25 à 70 Mo par langue, vérifiés par
+empreinte SHA-256) dans `%APPDATA%\custom-nav\translation`.
+
+- **Bouton 文A dans la barre d'adresse** : il apparaît quand la page est dans une autre langue que la langue
+  choisie (le français par défaut). Un clic ouvre le menu : traduire, afficher la page originale, corriger la
+  langue de la page, changer la langue de destination, **toujours traduire** une langue. Pendant la traduction,
+  le bouton clignote avec le pourcentage ; une fois la page traduite, il est en surbrillance.
+- **Menu ☰ ou clic droit dans la page** : « Traduire la page » / « Afficher la page originale ».
+- **Texte sélectionné → clic droit → « Traduire « … » en français »** : la traduction s'affiche dans une bulle
+  avec un bouton « Copier ». Si le texte est déjà en français, il est traduit en anglais.
+- La page est traduite par petits lots, **la partie visible à l'écran d'abord** ; le contenu ajouté ensuite par
+  le site (défilement infini…) est traduit au fur et à mesure. Les liens et boutons gardent leur fonctionnement.
+  Le code (`<code>`, `<pre>`), les champs de saisie et les zones marquées `translate="no"` ne sont pas traduits.
+- **Réglages > Traduction** : langue de destination, langues traduites automatiquement, télécharger ou supprimer
+  le modèle de chaque langue. Un modèle manquant est aussi téléchargé automatiquement à la première traduction.
+
+Langues : allemand, anglais, bulgare, espagnol, estonien, français, italien, néerlandais, polonais, portugais,
+russe, tchèque, ukrainien, ainsi que islandais, norvégien et persan (expérimental). Les modèles traduisent vers ou
+depuis l'anglais : de l'espagnol vers le français, la traduction passe par l'anglais (deux modèles).
+La qualité est un peu en dessous de DeepL ou Google ; la traduction tourne dans un processus séparé (arrêté après
+5 minutes d'inactivité pour libérer la mémoire).
+
 ### Pilotage par une IA (serveur MCP)
 
 Explora contient un serveur [MCP](https://modelcontextprotocol.io/) pour qu'une IA comme Claude (Claude Code,
@@ -370,6 +396,9 @@ src/
     settings.js  lecture / écriture de settings.json
     internal.js  protocole explora:// des pages internes
     messengers.js  barre latérale : catalogue, liste personnalisable, panneaux
+    translation/   traduction locale (Bergamot) : index.js (pages, sélection, menu), models.js
+                   (téléchargement des modèles), engine.js + worker.js (processus de traduction),
+                   languages.js (détection de la langue), content/ (scripts injectés dans les pages)
     mail.js      client mail : comptes, IMAP (imapflow), SMTP (nodemailer), notifications
     mail-providers.js  réglages IMAP / SMTP devinés à partir de l'adresse
   preload/

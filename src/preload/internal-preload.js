@@ -74,6 +74,15 @@ if (location.protocol === 'explora:') {
       setVisible: (on) => call('sidebar-set-visible', on),
       onChange: (cb) => ipcRenderer.on('internal:sidebar', (_e, s) => cb(s)),
     },
+    // traduction intégrée (langues téléchargées sur le PC)
+    translation: {
+      status: () => call('translation-status'),
+      install: (code) => call('translation-install', code),
+      remove: (code) => call('translation-remove', code),
+      setTarget: (code) => call('translation-set-target', code),
+      setAlways: (code, on) => call('translation-set-always', code, on),
+      onChange: (cb) => ipcRenderer.on('internal:translation', (_e, s) => cb(s)),
+    },
     // client mail (page customnav://mail/ uniquement, revérifié côté principal)
     mail: location.hostname === 'mail' ? {
       call: (action, ...args) => ipcRenderer.invoke('mail', action, ...args),

@@ -44,6 +44,9 @@ contextBridge.exposeInMainWorld('nav', {
   getAdblock: () => ipcRenderer.invoke('adblock:get-state'),
   onAdblock: (cb) => ipcRenderer.on('adblock:state', (_e, state) => cb(state)),
   adblockMenu: (x, y) => ipcRenderer.send('adblock:menu', x, y),
+  // traduction de la page
+  onTranslate: (cb) => ipcRenderer.on('translate:state', (_e, state) => cb(state)),
+  translateMenu: (x, y) => ipcRenderer.send('translate:menu', x, y),
 
   // moteurs de recherche / IA
   getEngines: () => ipcRenderer.invoke('engines:get-state'),

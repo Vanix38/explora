@@ -425,6 +425,71 @@ $('adblock-update').addEventListener('click', async (e) => {
 adApi.onChange(renderAdblock);
 adApi.status().then(renderAdblock);
 
+// --- Traduction ---
+const trApi = api.translation;
+const trBusy = new Set(); // langues en cours de téléchargement lancé depuis cette page
+
+const formatSize = (bytes) => `${Math.round(bytes / 1e6)} Mo`;
+
+function renderTranslation(st) {
+  const sel = $('translation-target');
+  if (document.activeElement !== sel) {
+    const targets = st.targets.length ? st.targets : [{ code: st.target, name: st.target }];
+    sel.replaceChildren(...targets.map((t) => el('option', { value: t.code, textContent: t.name })));
+    sel.value = st.target;
+  }
+
+  $('translation-always').replaceChildren(...(st.always.length ? st.always.map((a) => {
+    const del = el('button', { type: 'button', className: 'icon danger', textContent: '✕', title: `Ne plus traduire automatiquement ${a.name.toLowerCase()}` });
+    del.addEventListener('click', () => trApi.setAlways(a.code, false));
+    return el('div', { className: 'row allow-row' }, el('span', { textContent: a.name }), del);
+  }) : [el('p', { className: 'help', textContent: 'Aucune langue. Choisis « Toujours traduire… » dans le menu du bouton de traduction.' })]));
+
+  if (st.loading) {
+    $('translation-langs').replaceChildren(el('p', { className: 'help', textContent: 'Chargement de la liste des langues…' }));
+  } else if (st.error) {
+    $('translation-langs').replaceChildren(el('p', { className: 'status error', textContent: st.error }));
+  } else {
+    $('translation-langs').replaceChildren(...st.languages.map((l) => {
+      const name = el('span', { className: 'lang-name', textContent: l.name });
+      if (l.experimental) name.append(el('span', { className: 'badge', textContent: 'expérimental' }));
+      let state;
+      let action;
+      if (l.downloading) {
+        state = `Téléchargement… ${l.progress != null ? Math.round(l.progress * 100) + ' %' : ''}`;
+        action = el('button', { type: 'button', textContent: 'Télécharger', disabled: true });
+      } else if (l.installed) {
+        state = `Installée · ${formatSize(l.size)}`;
+        action = el('button', { type: 'button', className: 'danger', textContent: 'Supprimer' });
+        action.addEventListener('click', async () => {
+          const r = await trApi.remove(l.code);
+          setStatus('translation-status', r?.error || '', r?.error ? 'error' : '');
+        });
+      } else {
+        // une seule direction installée (téléchargée automatiquement par une traduction)
+        const lower = l.name.toLowerCase();
+        state = !l.partial ? formatSize(l.size)
+          : l.toEn ? `${l.name} → anglais installé` : `Anglais → ${lower} installé`;
+        action = el('button', { type: 'button', textContent: l.partial ? `Compléter (${formatSize(l.missingSize)})` : 'Télécharger' });
+        action.addEventListener('click', async () => {
+          trBusy.add(l.code);
+          action.disabled = true;
+          setStatus('translation-status', '');
+          const r = await trApi.install(l.code);
+          trBusy.delete(l.code);
+          setStatus('translation-status', r?.error ? `${l.name} : ${r.error}` : `${l.name} installée.`, r?.error ? 'error' : 'ok');
+        });
+      }
+      return el('div', { className: 'row lang-row' }, name,
+        el('span', { className: 'lang-state', textContent: state }), action);
+    }));
+  }
+}
+
+$('translation-target').addEventListener('change', (e) => trApi.setTarget(e.target.value));
+trApi.onChange(renderTranslation);
+trApi.status().then(renderTranslation);
+
 // --- Serveur MCP ---
 const mcpApi = api.mcp;
 

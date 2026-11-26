@@ -11,6 +11,7 @@ const extensions = require('./extensions');
 const adblock = require('./adblock');
 const resend = require('./resend');
 const mcp = require('./mcp');
+const translation = require('./translation');
 const suggest = require('./suggest');
 const { SuggestPopup } = require('./suggest-popup');
 const googleLogin = require('./google-login');
@@ -413,8 +414,10 @@ function createWindow({ isPrivate = false, restore = true } = {}) {
     getHomeUrl: () => (isPrivate ? config.HOME_PAGE : config.homeUrl()),
     onWebContentsCreated: (wc, { devtools = false } = {}) => {
       handleShortcuts(wc);
-      if (!devtools) handleContextMenu(wc); // les outils ont leur propre clic droit
-      else resend.attachDevTools(wc);
+      if (!devtools) {
+        handleContextMenu(wc); // les outils ont leur propre clic droit
+        translation.attach(wc);
+      } else resend.attachDevTools(wc);
     },
   });
   adblock.addSession(session.fromPartition(partition)); // pubs bloquées aussi en privé
@@ -659,6 +662,7 @@ ipcMain.on('ui:app-menu', fromUi((ctx, x, y) => {
     { label: 'Favoris', accelerator: 'Ctrl+Shift+O', click: () => openBookmarksManager(ctx) },
     { label: mail.totalUnseen() ? `Courrier (${mail.totalUnseen()} non lus)` : 'Courrier', accelerator: 'Ctrl+Shift+E', click: () => openMail(ctx) },
     { label: 'Extensions', click: () => ctx.tabs.focusOrCreate(config.EXTENSIONS_PAGE) },
+    translatePageItem(ctx),
     ...(ctx.isPrivate ? [] : [{ label: 'Barre latérale', accelerator: 'Ctrl+Shift+M', click: () => messengers.toggleRail() }]),
     { label: 'Outils de développement', accelerator: 'F12', click: () => ctx.tabs.toggleDevTools() },
     { type: 'separator' },
@@ -666,8 +670,31 @@ ipcMain.on('ui:app-menu', fromUi((ctx, x, y) => {
   ]).popup({ window: ctx.win, x: Math.max(0, Math.round(x) - APP_MENU_WIDTH), y: Math.round(y) });
 }));
 ipcMain.on('ui:open-settings', fromUi((ctx) => openSettings(ctx)));
+// --- Traduction (bouton de la barre d'adresse) ---
+ipcMain.on('translate:menu', fromUi((ctx, x, y) => {
+  const tab = ctx.tabs.active();
+  if (!tab || !isHttpUrl(tab.url)) return;
+  popupMenu(ctx, translation.menuTemplate(tab.view.webContents, { openSettings: () => openSettings(ctx) }), x, y);
+}));
 ipcMain.on('ui:open-history', fromUi((ctx) => openHistory(ctx)));
 ipcMain.on('ui:new-private-window', fromUi(() => createWindow({ isPrivate: true })));
+// « Traduire la page » / « Afficher la page originale » (menu ☰ et clic droit)
+function translatePageItem(ctx) {
+  const tab = ctx.tabs.active();
+  const wc = tab?.view.webContents;
+  const status = wc && isHttpUrl(tab.url) ? translation.uiState(wc).status : null;
+  const translated = status === 'translated' || status === 'translating' || status === 'downloading';
+  return {
+    label: translated ? 'Afficher la page originale' : 'Traduire la page',
+    enabled: !!status,
+    click: () => translation.togglePage(wc),
+  };
+}
+
+function translationChanged() {
+  for (const ctx of windows) ctx.tabs.broadcastInternal('internal:translation', translation.status());
+}
+
 // --- Serveur MCP ---
 function mcpChanged() {
   for (const ctx of windows) ctx.tabs.broadcastInternal('internal:mcp', mcp.status());
@@ -783,6 +810,12 @@ const INTERNAL_ACTIONS = {
   'sidebar-remove': (id) => messengers.removeItem(String(id || '')),
   'sidebar-move': (id, delta) => messengers.moveItem(String(id || ''), Number(delta) || 0),
   'sidebar-set-visible': (on) => messengers.setRailVisible(!!on),
+  // traduction intégrée (langues téléchargées)
+  'translation-status': () => translation.refresh(),
+  'translation-install': (code) => translation.install(String(code || '')),
+  'translation-remove': (code) => translation.remove(String(code || '')),
+  'translation-set-target': (code) => translation.setTarget(code),
+  'translation-set-always': (code, on) => translation.setAlways(String(code || ''), !!on),
   'clear-browsing-data': async () => {
     const ses = session.fromPartition(PARTITION);
     await ses.clearStorageData(); // cookies, localStorage, IndexedDB, service workers…
@@ -906,12 +939,23 @@ function handleContextMenu(webContents) {
       if (items.length) items.push({ type: 'separator' });
       items.push({ role: 'copy', label: 'Copier' });
     }
+    // traduction locale du texte sélectionné (bulle dans la page)
+    const selected = params.selectionText?.trim();
+    if (selected && /\p{L}/u.test(selected) && isHttpUrl(webContents.getURL())) {
+      items.push({
+        label: translation.selectionMenuLabel(webContents, selected),
+        click: () => translation.translateSelection(webContents, params.selectionText),
+      });
+    }
     if (!items.length) {
       items.push(
         { label: 'Précédent', enabled: webContents.navigationHistory.canGoBack(), click: () => webContents.navigationHistory.goBack() },
         { label: 'Suivant', enabled: webContents.navigationHistory.canGoForward(), click: () => webContents.navigationHistory.goForward() },
         { label: 'Recharger', click: () => webContents.reload() },
       );
+      if (ctx.tabs.tabFor(webContents) === ctx.tabs.active() && isHttpUrl(webContents.getURL())) {
+        items.push({ type: 'separator' }, translatePageItem(ctx));
+      }
     }
     const extItems = extensions.contextMenuItems(webContents, params);
     if (extItems.length) items.push({ type: 'separator' }, ...extItems);
@@ -946,6 +990,14 @@ app.whenReady().then(async () => {
     onStatusChange: mcpChanged,
   });
   extensions.onChange(extensionsChanged);
+  translation.init({
+    onTabState(wc, state) {
+      const ctx = ctxFor(wc);
+      const tab = ctx?.tabs.tabFor(wc);
+      if (tab && tab.view.webContents === wc) sendToUi(ctx, 'translate:state', { tabId: tab.id, ...state });
+    },
+    onStatus: translationChanged,
+  });
 
   // clic sur une notification de nouveau message : ouvre la page Courrier
   mail.init({ openPage: () => openMail(mainCtx) });
@@ -965,6 +1017,7 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   history.saveNow();
+  translation.stop();
   mail.shutdown();
 });
 

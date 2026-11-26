@@ -114,6 +114,26 @@
       <p class="status" id="adblock-status" role="status"></p>
     </section>
 
+    <section id="translation-section">
+      <h2>Traduction</h2>
+      <p class="help">Les pages et le texte sélectionné sont traduits <b>sur ton PC</b> avec Bergamot, le moteur
+        de Firefox Translations : rien n'est envoyé à Google ni à un autre service. Il faut seulement télécharger
+        une fois le modèle de chaque langue (environ 25 à 70 Mo). Un modèle manquant est aussi téléchargé
+        automatiquement à la première traduction. Pour traduire, clique sur le bouton
+        <span class="tr-icon" aria-hidden="true">文A</span> de la barre d'adresse, ou fais un clic droit sur un texte sélectionné.</p>
+      <div class="row">
+        <label for="translation-target">Traduire vers :</label>
+        <select id="translation-target"></select>
+      </div>
+      <h3>Toujours traduire automatiquement</h3>
+      <div id="translation-always"></div>
+      <h3>Langues</h3>
+      <p class="help">Les traductions passent par l'anglais : pour traduire de l'espagnol vers le français, il faut
+        l'espagnol et le français. Les langues marquées « expérimental » sont de qualité moindre.</p>
+      <div id="translation-langs"></div>
+      <p class="status" id="translation-status" role="status"></p>
+    </section>
+
     <section id="mcp-section">
       <h2>Pilotage par une IA (MCP)</h2>
       <label class="check"><input type="checkbox" id="mcp-enabled" />

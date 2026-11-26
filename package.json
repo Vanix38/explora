@@ -58,6 +58,7 @@
     }
   },
   "dependencies": {
+    "@browsermt/bergamot-translator": "^0.4.9",
     "@ghostery/adblocker-electron": "^2.20.3",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "electron-chrome-extensions": "^4.10.0",

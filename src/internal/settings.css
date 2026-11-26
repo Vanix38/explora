@@ -209,3 +209,12 @@ span.side-icon {
   word-break: break-all;
   user-select: all;
 }
+
+/* --- traduction --- */
+.tr-icon { padding: 0 4px; border-radius: 4px; background: var(--surface-2); font-size: 12px; }
+.lang-row { padding: 7px 0; border-bottom: 1px solid var(--border); }
+.lang-row .lang-name { flex: 1; display: flex; align-items: center; gap: 8px; }
+.lang-row .lang-state { color: var(--fg-dim); font-size: 13px; min-width: 150px; text-align: right; }
+.lang-row button { min-width: 150px; }
+.badge { padding: 1px 6px; border-radius: 8px; background: var(--surface-2); color: var(--fg-dim); font-size: 11px; }
+#translation-target { min-width: 180px; }
