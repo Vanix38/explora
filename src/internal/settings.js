@@ -225,6 +225,7 @@ document.querySelectorAll('input[name="theme"]').forEach((r) => r.addEventListen
 
 // --- Session et données ---
 $('restore-tabs').addEventListener('change', (e) => api.setRestoreTabs(e.target.checked));
+$('search-suggestions').addEventListener('change', (e) => api.setSearchSuggestions(e.target.checked));
 
 $('clear-data').addEventListener('click', () => {
   $('clear-confirm').hidden = false;
@@ -255,6 +256,7 @@ function apply(c) {
   if (document.activeElement !== $('home-url')) renderHome();
   document.querySelector(`input[name="theme"][value="${cfg.theme}"]`).checked = true;
   $('restore-tabs').checked = cfg.restoreTabs;
+  $('search-suggestions').checked = cfg.searchSuggestions;
 }
 
 api.onConfig(apply);

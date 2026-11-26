@@ -32,6 +32,8 @@ function getConfig() {
     restoreTabs: settings.get('restoreTabs', true) !== false,
     favorites: settings.get('favorites', DEFAULT_FAVORITES),
     showBookmarksBar: settings.get('showBookmarksBar', true) !== false,
+    // suggestions du moteur pendant la frappe dans la barre d'adresse
+    searchSuggestions: settings.get('searchSuggestions', true) !== false,
   };
 }
 
@@ -98,6 +100,11 @@ function setShowBookmarksBar(on) {
   return {};
 }
 
+function setSearchSuggestions(on) {
+  settings.set('searchSuggestions', !!on);
+  return {};
+}
+
 function setFavorites(list) {
   if (!Array.isArray(list)) return { error: 'Liste invalide.' };
   const out = [];
@@ -125,5 +132,6 @@ function saveSession(session) {
 module.exports = {
   HOME_PAGE, SETTINGS_PAGE, HISTORY_PAGE, BOOKMARKS_PAGE, EXTENSIONS_PAGE, load, getConfig, homeUrl,
   setEngines, resetEngines, setActiveEngine, setHomepage, setTheme, setRestoreTabs, setFavorites, setShowBookmarksBar,
+  setSearchSuggestions,
   getLastSession, saveSession,
 };
