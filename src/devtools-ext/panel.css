@@ -1,0 +1,110 @@
+:root {
+  --bg: #fff;
+  --bg-2: #f3f3f3;
+  --fg: #1f1f1f;
+  --muted: #666;
+  --border: #d0d0d0;
+  --accent: #1a73e8;
+  --accent-fg: #fff;
+  --selected: #cfe1fc;
+  --ok: #188038;
+  --warn: #b06000;
+  --err: #d93025;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #202124;
+  --bg-2: #292a2d;
+  --fg: #e3e3e3;
+  --muted: #9aa0a6;
+  --border: #3c4043;
+  --accent: #8ab4f8;
+  --accent-fg: #202124;
+  --selected: #33415a;
+  --ok: #81c995;
+  --warn: #fdd663;
+  --err: #f28b82;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font: 12px system-ui, "Segoe UI", sans-serif;
+}
+input, textarea, button { font: inherit; color: inherit; }
+input[type="text"], input[type="search"], #method, textarea {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  min-width: 0;
+}
+textarea, pre, #url, #method { font-family: Consolas, "Cascadia Mono", monospace; }
+textarea { width: 100%; resize: vertical; }
+input:focus, textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+button {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+button:disabled { opacity: .6; cursor: progress; }
+
+.layout { display: flex; flex-direction: column; height: 100%; }
+.requests { display: flex; flex-direction: column; flex: 0 0 34%; min-height: 120px; border-bottom: 1px solid var(--border); }
+.editor { flex: 1; overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+@media (min-width: 900px) {
+  .layout { flex-direction: row; }
+  .requests { flex: 0 0 38%; border-bottom: 0; border-right: 1px solid var(--border); }
+}
+
+.toolbar { display: flex; gap: 6px; padding: 6px; border-bottom: 1px solid var(--border); background: var(--bg-2); }
+.toolbar input { flex: 1; }
+#list { list-style: none; margin: 0; padding: 0; overflow: auto; flex: 1; }
+#list li {
+  display: grid;
+  grid-template-columns: 64px 32px 1fr;
+  gap: 6px;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--bg-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+#list li:hover { background: var(--bg-2); }
+#list li.selected { background: var(--selected); }
+#list li.separator { display: block; color: var(--muted); font-style: italic; cursor: default; background: none; overflow: hidden; text-overflow: ellipsis; }
+#list .m { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+#list .ok { color: var(--ok); }
+#list .warn { color: var(--warn); }
+#list .err { color: var(--err); }
+#list .u { overflow: hidden; text-overflow: ellipsis; }
+.hint { color: var(--muted); padding: 8px; margin: 0; }
+
+#form { display: flex; flex-direction: column; gap: 8px; }
+.line { display: flex; gap: 6px; }
+#method { width: 90px; flex: none; text-transform: uppercase; font-weight: 600; }
+#url { flex: 1; }
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field small { color: var(--muted); }
+.options { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+.options label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+
+.result { border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.result[hidden] { display: none; }
+.status-line { display: flex; gap: 10px; align-items: center; }
+.status { font-weight: 700; }
+.status.ok { color: var(--ok); }
+.status.warn { color: var(--warn); }
+.status.err { color: var(--err); }
+.meta { color: var(--muted); flex: 1; }
+.notice { margin: 0; color: var(--warn); }
+pre { margin: 0; white-space: pre-wrap; word-break: break-all; }
+#res-headers { padding: 6px; background: var(--bg-2); border-radius: 4px; }
+.res-body { padding: 6px; background: var(--bg-2); border-radius: 4px; min-height: 40px; }
+summary { cursor: pointer; color: var(--muted); }

@@ -1,4 +1,4 @@
-// Gestionnaire de favoris (customnav://bookmarks/). Chaque modification est
+// Gestionnaire de favoris (explora://bookmarks/). Chaque modification est
 // envoyée tout de suite au processus principal, qui valide et enregistre.
 const api = window.customNav.bookmarks;
 const $ = (id) => document.getElementById(id);

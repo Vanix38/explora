@@ -11,6 +11,12 @@ const PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
 
 const PARTITION = 'persist:main'; // garde cookies / connexions entre les lancements
 
+// Écran partagé : plusieurs onglets côte à côte dans la fenêtre
+const SPLIT_MAX = 4; // panneaux au plus par écran partagé
+const SPLIT_GAP = 8; // largeur du séparateur (dessiné par l'interface, sous les pages)
+const SPLIT_MARGIN = 2; // marge autour des panneaux : liseré du panneau actif
+const SPLIT_MIN_WIDTH = 200; // largeur minimale d'un panneau
+
 // Script exécuté dans la page pour écrire une question dans son champ de saisie
 // (sites qui n'acceptent pas la question dans l'URL). N'envoie rien.
 function injectScript({ selector, text }) {
@@ -67,8 +73,15 @@ class TabManager extends EventEmitter {
     // groupe se suivent toujours dans this.order (tab.groupId).
     this.groups = new Map();
     this.nextGroupId = 1;
+    // Écrans partagés : { ids: [onglets de gauche à droite], sizes: [fractions] }
+    this.splits = [];
+    this.attached = new Set(); // vues actuellement affichées dans la fenêtre
+    this.splitLayout = null; // dernière disposition envoyée à l'interface
+    this.resizing = null; // { group, index } pendant le glissement d'un séparateur
 
     win.on('resize', () => this.layout());
+    // glissement d'un séparateur : la souris peut passer au-dessus d'une page
+    win.webContents.on('before-mouse-event', (e, m) => this.onResizeMouse(e, m, 0));
   }
 
   // `groupId` : ajoute l'onglet à ce groupe (placé à la fin du groupe)
@@ -106,6 +119,9 @@ class TabManager extends EventEmitter {
       if (d.isMainFrame && !d.isSameDocument) tab.blocked = 0;
     });
     wc.on('did-stop-loading', () => update({ loading: false }));
+    // clic dans un panneau de l'écran partagé : il devient l'onglet actif
+    wc.on('focus', () => this.focusPane(id));
+    wc.on('before-mouse-event', (e, m) => this.onResizeMouse(e, m, view.getBounds().x));
     wc.on('did-navigate', (_e, navUrl, httpCode) => {
       // Mémorise la question si la page est une page de résultats connue
       update({ url: navUrl, favicon: null, query: extractQuery(navUrl) || tab.query });
@@ -162,35 +178,241 @@ class TabManager extends EventEmitter {
     // un onglet d'un groupe replié devient visible : on déplie le groupe
     const group = this.groups.get(tab.groupId);
     if (group) group.collapsed = false;
-    if (this.activeId && this.activeId !== id) {
-      const prev = this.tabs.get(this.activeId);
-      if (prev) {
-        this.win.contentView.removeChildView(prev.view);
-        if (prev.devtools) this.win.contentView.removeChildView(prev.devtools);
-      }
-    }
     this.activeId = id;
-    this.win.contentView.addChildView(tab.view);
-    if (tab.devtools) this.win.contentView.addChildView(tab.devtools);
+    this.syncViews();
     this.layout();
     tab.view.webContents.focus();
     this.emit('tab-activated', tab);
     this.emitState();
   }
 
+  // Affiche exactement les vues voulues : l'onglet actif (ou tous les panneaux
+  // de son écran partagé) et les outils de développement de l'onglet actif.
+  syncViews() {
+    const want = new Set();
+    for (const id of this.visibleIds()) want.add(this.tabs.get(id).view);
+    const devtools = this.active()?.devtools;
+    if (devtools) want.add(devtools);
+    for (const view of this.attached) {
+      if (!want.has(view)) this.win.contentView.removeChildView(view);
+    }
+    for (const view of want) {
+      if (!this.attached.has(view)) this.win.contentView.addChildView(view);
+    }
+    this.attached = want;
+  }
+
+  detach(view) {
+    if (!view) return;
+    this.win.contentView.removeChildView(view);
+    this.attached.delete(view);
+  }
+
+  // --- Écran partagé ---
+  splitOf(id) {
+    return this.splits.find((g) => g.ids.includes(id)) || null;
+  }
+
+  // Onglets affichés : le groupe de l'onglet actif, sinon l'onglet actif seul
+  visibleIds() {
+    if (!this.tabs.has(this.activeId)) return [];
+    return this.splitOf(this.activeId)?.ids || [this.activeId];
+  }
+
+  // Le focus est passé dans un autre panneau du même écran partagé
+  focusPane(id) {
+    if (id === this.activeId || !this.visibleIds().includes(id)) return;
+    this.activeId = id;
+    this.syncViews(); // les outils de développement suivent l'onglet actif
+    this.layout();
+    this.emit('tab-activated', this.tabs.get(id));
+    this.emitState();
+  }
+
+  // Ajoute aux onglets donnés les autres panneaux de leurs écrans partagés
+  withSplitPartners(tabIds) {
+    const all = new Set(tabIds);
+    for (const id of tabIds) for (const p of this.splitOf(id)?.ids || []) all.add(p);
+    return [...all];
+  }
+
+  // Un nouveau panneau rejoint le groupe d'onglets du panneau de base (ou en sort)
+  alignTabGroup(id, baseId) {
+    const gid = this.tabs.get(baseId)?.groupId || null;
+    if (this.tabs.get(id)?.groupId === gid) return;
+    if (gid) this.addToGroup([id], gid, { silent: true });
+    else this.removeFromGroup([id]);
+  }
+
+  // Les onglets d'un écran partagé restent côte à côte dans la barre d'onglets
+  packSplitOrder(group) {
+    const first = Math.min(...group.ids.map((id) => this.order.indexOf(id)));
+    const rest = this.order.filter((id) => !group.ids.includes(id));
+    const before = this.order.slice(0, first).filter((id) => !group.ids.includes(id)).length;
+    rest.splice(before, 0, ...group.ids);
+    this.order = rest;
+  }
+
+  // Retire un onglet de son écran partagé (le groupe disparaît s'il reste seul)
+  leaveSplit(id) {
+    const g = this.splitOf(id);
+    if (!g) return;
+    const i = g.ids.indexOf(id);
+    g.ids.splice(i, 1);
+    const [freed] = g.sizes.splice(i, 1);
+    if (g.ids.length < 2) {
+      this.splits.splice(this.splits.indexOf(g), 1);
+    } else {
+      // la place libérée va au voisin
+      g.sizes[Math.min(i, g.sizes.length - 1)] += freed;
+    }
+  }
+
+  // Affiche l'onglet `otherId` à droite de `baseId` (l'onglet actif par défaut)
+  splitWith(otherId, baseId = this.activeId) {
+    if (otherId === baseId || !this.tabs.has(otherId) || !this.tabs.has(baseId)) return false;
+    let g = this.splitOf(baseId);
+    if (g?.ids.includes(otherId)) {
+      this.activate(otherId);
+      return true;
+    }
+    if (g && g.ids.length >= SPLIT_MAX) return false;
+    this.leaveSplit(otherId);
+    this.alignTabGroup(otherId, baseId);
+    if (!g) {
+      g = { ids: [baseId], sizes: [1] };
+      this.splits.push(g);
+    }
+    g.ids.splice(g.ids.indexOf(baseId) + 1, 0, otherId);
+    g.sizes = g.ids.map(() => 1 / g.ids.length); // parts égales
+    this.packSplitOrder(g);
+    this.activate(otherId);
+    return true;
+  }
+
+  canSplitWith(otherId, baseId = this.activeId) {
+    const g = this.splitOf(baseId);
+    return otherId !== baseId && !g?.ids.includes(otherId) && (g?.ids.length || 1) < SPLIT_MAX;
+  }
+
+  // Ouvre une cible (page d'accueil par défaut) dans un nouveau panneau à droite
+  openInSplit(target, baseId = this.activeId) {
+    const g = this.splitOf(baseId);
+    if (g && g.ids.length >= SPLIT_MAX) {
+      const id = this.create(target); // plus de place : simple nouvel onglet
+      return id;
+    }
+    const id = this.create(target, { activate: false });
+    this.splitWith(id, baseId);
+    return id;
+  }
+
+  // Ferme l'écran partagé : chaque onglet redevient un onglet normal
+  unsplit(id = this.activeId) {
+    const g = this.splitOf(id);
+    if (!g) return;
+    this.splits.splice(this.splits.indexOf(g), 1);
+    this.activate(this.tabs.has(id) ? id : this.activeId);
+  }
+
+  // Bouton / Ctrl+Shift+S : ouvre un écran partagé, ou le ferme
+  toggleSplit() {
+    if (this.splitOf(this.activeId)) this.unsplit();
+    else this.openInSplit();
+  }
+
+  // Retire un onglet de l'écran partagé sans le fermer
+  removeFromSplit(id) {
+    if (!this.splitOf(id)) return;
+    this.leaveSplit(id);
+    this.activate(id);
+  }
+
+  // Inverse l'ordre des panneaux
+  swapSplit(id = this.activeId) {
+    const g = this.splitOf(id);
+    if (!g) return;
+    g.ids.reverse();
+    g.sizes.reverse();
+    this.packSplitOrder(g);
+    this.layout();
+    this.emitState();
+  }
+
+  // Séparateurs : partager l'espace également (double-clic)
+  resetSplitSizes() {
+    const g = this.splitOf(this.activeId);
+    if (!g) return;
+    g.sizes = g.ids.map(() => 1 / g.ids.length);
+    this.layout();
+  }
+
+  // Recrée un écran partagé au lancement (onglets rouverts)
+  restoreSplit(ids, sizes) {
+    const valid = ids.filter((id) => this.tabs.has(id) && !this.splitOf(id));
+    if (valid.length < 2) return;
+    const ok = Array.isArray(sizes) && sizes.length === valid.length && sizes.every((s) => Number.isFinite(s) && s > 0);
+    const total = ok ? sizes.reduce((a, b) => a + b, 0) : 1;
+    const g = { ids: valid.slice(0, SPLIT_MAX), sizes: [] };
+    for (const id of g.ids.slice(1)) this.alignTabGroup(id, g.ids[0]);
+    g.sizes = g.ids.map((_, i) => (ok ? sizes[i] / total : 1 / g.ids.length));
+    this.splits.push(g);
+    this.packSplitOrder(g);
+  }
+
+  // L'interface signale le début du glissement du séparateur n° index
+  startResize(index) {
+    const g = this.splitOf(this.activeId);
+    if (!g || !this.splitLayout || index < 0 || index >= g.ids.length - 1) return;
+    this.resizing = { group: g, index };
+  }
+
+  // Pendant le glissement, tous les mouvements de souris (interface et pages)
+  // arrivent ici (x relatif à la vue, d'où offsetX) ; le bouton relâché
+  // termine le glissement.
+  onResizeMouse(event, mouse, offsetX) {
+    if (!this.resizing) return;
+    event.preventDefault();
+    // pendant un déplacement, `button` indique le bouton enfoncé (« none » s'il
+    // a été relâché hors de la fenêtre)
+    if (mouse.type === 'mouseUp' || (mouse.type === 'mouseMove' && mouse.button !== 'left')) {
+      this.resizing = null;
+      this.emit('split-resized');
+      return;
+    }
+    if (mouse.type !== 'mouseMove') return;
+    const { group: g, index: i } = this.resizing;
+    const panes = this.splitLayout?.panes;
+    if (!panes || !this.splits.includes(g) || panes.length !== g.ids.length) return;
+    const x = mouse.x + offsetX;
+    const a = panes[i];
+    const b = panes[i + 1];
+    const pair = a.width + b.width;
+    const left = Math.max(SPLIT_MIN_WIDTH, Math.min(pair - SPLIT_MIN_WIDTH, x - SPLIT_GAP / 2 - a.x));
+    const share = g.sizes[i] + g.sizes[i + 1];
+    g.sizes[i] = (share * left) / pair;
+    g.sizes[i + 1] = share - g.sizes[i];
+    this.layout();
+  }
+
   close(id = this.activeId) {
     const tab = this.tabs.get(id);
     if (!tab) return;
     const idx = this.order.indexOf(id);
+    // si l'onglet était dans un écran partagé, un autre panneau prend le relais
+    const partners = this.splitOf(id)?.ids.filter((t) => t !== id) || [];
+    this.leaveSplit(id);
+    if (this.resizing && !this.splits.includes(this.resizing.group)) this.resizing = null;
     this.order.splice(idx, 1);
     this.tabs.delete(id);
-    this.win.contentView.removeChildView(tab.view);
+    this.detach(tab.view);
     if (tab.devtools) {
-      this.win.contentView.removeChildView(tab.devtools);
+      this.detach(tab.devtools);
       tab.devtools.webContents.close();
     }
     this.emit('tab-closed', tab);
     tab.view.webContents.close();
+    for (const sp of this.splits) this.packSplitOrder(sp); // panneaux dans l'ordre
     this.pruneGroups();
 
     if (this.order.length === 0) {
@@ -200,11 +422,14 @@ class TabManager extends EventEmitter {
     }
     if (this.activeId === id) {
       this.activeId = null;
-      // de préférence un onglet visible (pas dans un groupe replié)
+      // de préférence un autre panneau de l'écran partagé, sinon un onglet
+      // visible (pas dans un groupe replié)
       const visible = this.order.filter((t) => this.isVisible(t));
-      const next = visible.find((t) => this.order.indexOf(t) >= idx) ?? visible[visible.length - 1];
+      const next = partners[0] ?? visible.find((t) => this.order.indexOf(t) >= idx) ?? visible[visible.length - 1];
       this.activate(next ?? this.order[Math.min(idx, this.order.length - 1)]);
     } else {
+      this.syncViews();
+      this.layout();
       this.emitState();
     }
   }
@@ -246,6 +471,7 @@ class TabManager extends EventEmitter {
   // Met ces onglets dans le groupe, à la suite de ses onglets actuels
   addToGroup(tabIds, groupId, { silent = false } = {}) {
     if (!this.groups.has(groupId)) return;
+    tabIds = this.withSplitPartners(tabIds); // un écran partagé change de groupe en entier
     const ids = this.order.filter((t) => tabIds.includes(t)); // garde l'ordre actuel
     if (ids.length === 0) return;
     const members = this.order.filter((t) => this.tabs.get(t).groupId === groupId && !ids.includes(t));
@@ -258,12 +484,14 @@ class TabManager extends EventEmitter {
     at = this.groupBoundary(at);
     this.order.splice(at, 0, ...ids);
     for (const t of ids) this.tabs.get(t).groupId = groupId;
+    for (const sp of this.splits) this.packSplitOrder(sp); // panneaux dans l'ordre
     this.pruneGroups();
     if (!silent) this.emitState();
   }
 
   // Sort ces onglets de leur groupe (placés juste après le groupe)
   removeFromGroup(tabIds) {
+    tabIds = this.withSplitPartners(tabIds);
     for (const id of this.order.filter((t) => tabIds.includes(t))) {
       const tab = this.tabs.get(id);
       if (!tab?.groupId) continue;
@@ -274,6 +502,7 @@ class TabManager extends EventEmitter {
       const at = members.length ? this.order.indexOf(members[members.length - 1]) + 1 : this.order.length;
       this.order.splice(at, 0, id);
     }
+    for (const sp of this.splits) this.packSplitOrder(sp); // panneaux dans l'ordre
     this.pruneGroups();
     this.emitState();
   }
@@ -393,19 +622,55 @@ class TabManager extends EventEmitter {
 
   layout() {
     const tab = this.active();
-    if (!tab) return;
+    if (!tab || this.win.isDestroyed()) return;
     const [width, height] = this.win.getContentSize();
-    const h = Math.max(0, height - this.topOffset);
+    const y = this.topOffset;
+    const h = Math.max(0, height - y);
     const x = Math.min(this.leftInset, width); // barre des messageries à gauche
-    const w = width - x;
+    let w = width - x;
     if (tab.devtools) {
-      // outils de développement ancrés à droite de la page, comme dans Chrome
+      // outils de développement ancrés à droite de la page (ou des panneaux), comme dans Chrome
       const dw = Math.max(0, Math.min(Math.max(380, Math.round(w * 0.4)), w - 200));
-      tab.view.setBounds({ x, y: this.topOffset, width: w - dw, height: h });
-      tab.devtools.setBounds({ x: x + w - dw, y: this.topOffset, width: dw, height: h });
-    } else {
-      tab.view.setBounds({ x, y: this.topOffset, width: w, height: h });
+      tab.devtools.setBounds({ x: x + w - dw, y, width: dw, height: h });
+      w -= dw;
     }
+    const ids = this.visibleIds();
+    if (ids.length < 2) {
+      tab.view.setBounds({ x, y, width: w, height: h });
+      this.setSplitLayout(null);
+      return;
+    }
+    // Écran partagé : panneaux côte à côte, séparés par une bande que l'interface
+    // (sous les pages) dessine et qui sert de poignée de redimensionnement.
+    const g = this.splitOf(this.activeId);
+    const M = SPLIT_MARGIN;
+    const inner = Math.max(0, w - 2 * M - SPLIT_GAP * (ids.length - 1));
+    const ph = Math.max(0, h - 2 * M);
+    const panes = [];
+    const dividers = [];
+    let px = x + M;
+    ids.forEach((id, i) => {
+      const last = i === ids.length - 1;
+      const pw = last ? x + w - M - px : Math.round(inner * g.sizes[i]);
+      const bounds = { x: px, y: y + M, width: Math.max(0, pw), height: ph };
+      this.tabs.get(id).view.setBounds(bounds);
+      panes.push({ ...bounds, id, active: id === this.activeId });
+      px += pw;
+      if (!last) {
+        dividers.push({ x: px, y: y + M, width: SPLIT_GAP, height: ph, index: i });
+        px += SPLIT_GAP;
+      }
+    });
+    this.setSplitLayout({ panes, dividers, margin: M });
+  }
+
+  // Positions des panneaux et séparateurs, envoyées à l'interface qui les dessine
+  setSplitLayout(layout) {
+    const key = JSON.stringify(layout);
+    if (key === this.splitLayoutKey) return;
+    this.splitLayoutKey = key;
+    this.splitLayout = layout;
+    this.emit('split-layout', layout);
   }
 
   // --- Outils de développement (Chrome DevTools) de l'onglet ---
@@ -420,7 +685,7 @@ class TabManager extends EventEmitter {
       wc.setDevToolsWebContents(view.webContents);
       wc.openDevTools({ mode: 'detach', activate: true });
       wc.once('devtools-closed', () => this.closeDevTools(tab));
-      if (tab.id === this.activeId) this.win.contentView.addChildView(view);
+      if (tab.id === this.activeId) this.syncViews();
       this.layout();
     }
     return tab;
@@ -430,7 +695,7 @@ class TabManager extends EventEmitter {
     if (!tab?.devtools) return;
     const view = tab.devtools;
     tab.devtools = null;
-    this.win.contentView.removeChildView(view);
+    this.detach(view);
     const wc = tab.view.webContents;
     if (!wc.isDestroyed() && wc.isDevToolsOpened()) wc.closeDevTools();
     if (!view.webContents.isDestroyed()) view.webContents.close();
@@ -456,9 +721,16 @@ class TabManager extends EventEmitter {
       activeId: this.activeId,
       canGoBack: !!h && h.canGoBack(),
       canGoForward: !!h && h.canGoForward(),
+      split: this.visibleIds().length > 1,
       tabs: this.order.map((id) => {
         const t = this.tabs.get(id);
-        return { id: t.id, title: t.title, url: t.url, favicon: t.favicon, loading: t.loading, query: t.query, blocked: t.blocked, groupId: t.groupId };
+        const g = this.splitOf(id);
+        // position dans l'écran partagé : pour dessiner les onglets regroupés
+        const splitPos = !g ? null : g.ids.length === 1 ? 'only' : g.ids[0] === id ? 'first' : g.ids[g.ids.length - 1] === id ? 'last' : 'middle';
+        return {
+          id: t.id, title: t.title, url: t.url, favicon: t.favicon, loading: t.loading, query: t.query, blocked: t.blocked,
+          groupId: t.groupId, splitPos, shown: this.visibleIds().includes(id),
+        };
       }),
       groups: [...this.groups.values()].map((g) => ({ ...g })),
     };
@@ -475,6 +747,7 @@ class TabManager extends EventEmitter {
       }),
       groups: groups.map(({ title, color, collapsed }) => ({ title, color, collapsed })),
       active: Math.max(0, this.order.indexOf(this.activeId)),
+      splits: this.splits.map((g) => ({ tabs: g.ids.map((id) => this.order.indexOf(id)), sizes: g.sizes })),
     };
   }
 

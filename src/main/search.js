@@ -13,6 +13,8 @@
 // DEFAULT_ENGINES est la liste d'origine ; la liste réellement utilisée est
 // éditable dans les réglages (setEngines).
 
+const { upgradeLegacyUrl } = require('./migrate');
+
 const DEFAULT_ENGINES = [
   { id: 'google', name: 'Google', type: 'search', url: 'https://www.google.com/search?q={q}', home: 'https://www.google.com/' },
   { id: 'duckduckgo', name: 'DuckDuckGo', type: 'search', url: 'https://duckduckgo.com/?q={q}', home: 'https://duckduckgo.com/' },
@@ -128,7 +130,7 @@ function resolveInput(input, engineId = DEFAULT_ENGINE_ID) {
   const text = String(input || '').trim();
   const engine = getEngine(engineId);
   if (!text) return { url: engine.home };
-  if (/^(https?|file|about|view-source|customnav):/i.test(text)) return { url: text };
+  if (/^(https?|file|about|view-source|explora|customnav):/i.test(text)) return { url: upgradeLegacyUrl(text) };
   if (looksLikeUrl(text)) {
     const isLocal = /^(localhost|\d{1,3}(\.\d{1,3}){3})/i.test(text);
     return { url: (isLocal ? 'http://' : 'https://') + text };

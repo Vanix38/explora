@@ -8,6 +8,7 @@
 const { app, dialog, session } = require('electron');
 const { ElectronChromeExtensions } = require('electron-chrome-extensions');
 const { installChromeWebStore, uninstallExtension, updateExtensions } = require('electron-chrome-web-store');
+const { isResendExtension } = require('./resend');
 
 const WEB_STORE_URL = 'https://chromewebstore.google.com/';
 
@@ -49,7 +50,7 @@ async function beforeInstall({ localizedName, manifest, icon, browserWindow }) {
   const detail = [
     perms.length ? `Elle pourra :\n• ${perms.join('\n• ')}` : "Elle ne demande pas d'autorisation particulière.",
     '',
-    "Custom Nav n'est pas Chrome : certaines extensions ne fonctionnent qu'en partie, voire pas du tout.",
+    "Explora n'est pas Chrome : certaines extensions ne fonctionnent qu'en partie, voire pas du tout.",
   ].join('\n');
   const options = {
     type: 'question',
@@ -111,10 +112,10 @@ function optionsUrl(ext) {
   return page ? `chrome-extension://${ext.id}/${page.replace(/^\//, '')}` : null;
 }
 
-// Liste affichée dans customnav://extensions/
+// Liste affichée dans explora://extensions/
 function list() {
   if (!extSession) return [];
-  return extSession.extensions.getAllExtensions().map((ext) => ({
+  return extSession.extensions.getAllExtensions().filter((ext) => !isResendExtension(ext)).map((ext) => ({
     id: ext.id,
     name: ext.name,
     version: ext.version,
@@ -128,7 +129,7 @@ function list() {
 
 async function remove(id) {
   const ext = extSession?.extensions.getExtension(id);
-  if (!ext) return { error: 'Extension introuvable.' };
+  if (!ext || isResendExtension(ext)) return { error: 'Extension introuvable.' };
   try {
     await uninstallExtension(id, { session: extSession });
   } catch (e) {

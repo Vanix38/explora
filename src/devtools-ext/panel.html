@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Renvoyer</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <div class="layout">
+    <section class="requests">
+      <div class="toolbar">
+        <input id="filter" type="search" placeholder="Filtrer les requêtes" spellcheck="false">
+        <button id="new" type="button" title="Écrire une requête à partir de zéro">Nouvelle</button>
+        <button id="clear" type="button" title="Vider la liste">Effacer</button>
+      </div>
+      <ul id="list" aria-label="Requêtes de la page"></ul>
+      <p id="empty" class="hint">Les requêtes de la page apparaissent ici tant que les outils de développement sont ouverts. Rechargez la page pour voir les premières.</p>
+    </section>
+
+    <section class="editor">
+      <form id="form">
+        <div class="line">
+          <input id="method" list="methods" value="GET" aria-label="Méthode" spellcheck="false" autocomplete="off">
+          <datalist id="methods">
+            <option value="GET"></option><option value="POST"></option><option value="PUT"></option>
+            <option value="PATCH"></option><option value="DELETE"></option><option value="HEAD"></option>
+            <option value="OPTIONS"></option>
+          </datalist>
+          <input id="url" type="text" placeholder="https://…" aria-label="URL" spellcheck="false" autocomplete="off">
+          <button id="send" type="submit" class="primary">Envoyer</button>
+        </div>
+        <label class="field">
+          <span>En-têtes <small>(un par ligne, « Nom: valeur » ; une ligne commençant par # est ignorée)</small></span>
+          <textarea id="headers" rows="8" spellcheck="false"></textarea>
+        </label>
+        <label class="field">
+          <span>Corps</span>
+          <textarea id="body" rows="6" spellcheck="false"></textarea>
+        </label>
+        <div class="options">
+          <label title="Envoyée par le navigateur avec les cookies de l'onglet : tous les en-têtes sont modifiables et il n'y a pas de restriction CORS (comme dans Firefox).">
+            <input type="radio" name="mode" value="browser" checked> Depuis le navigateur
+          </label>
+          <label title="fetch() exécuté dans la page : la requête apparaît dans l'onglet Réseau, mais CORS s'applique et Cookie, Origin, Referer… sont ignorés.">
+            <input type="radio" name="mode" value="page"> Depuis la page
+          </label>
+          <label><input id="follow" type="checkbox" checked> Suivre les redirections</label>
+        </div>
+      </form>
+
+      <div id="result" class="result" hidden>
+        <div class="status-line">
+          <span id="status" class="status"></span>
+          <span id="meta" class="meta"></span>
+          <button id="copy" type="button">Copier la réponse</button>
+        </div>
+        <p id="notice" class="notice" hidden></p>
+        <details id="res-headers-box">
+          <summary>En-têtes de la réponse</summary>
+          <pre id="res-headers"></pre>
+        </details>
+        <pre id="res-body" class="res-body"></pre>
+      </div>
+    </section>
+  </div>
+  <script src="panel.js"></script>
+</body>
+</html>

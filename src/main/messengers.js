@@ -574,7 +574,7 @@ class MessengerPanel {
   }
 }
 
-const SETTINGS_URL = 'customnav://settings/#sidebar';
+const SETTINGS_URL = 'explora://settings/#sidebar';
 
 async function clearItemData(id) {
   const ses = session.fromPartition(partitionFor(id));

@@ -25,6 +25,12 @@ contextBridge.exposeInMainWorld('nav', {
   reload: () => ipcRenderer.send('nav:reload'),
   stop: () => ipcRenderer.send('nav:stop'),
   getState: () => ipcRenderer.invoke('tabs:get-state'),
+  // écran partagé
+  toggleSplit: () => ipcRenderer.send('split:toggle'),
+  splitResizeStart: (index) => ipcRenderer.send('split:resize-start', index),
+  splitReset: () => ipcRenderer.send('split:reset'),
+  getSplitLayout: () => ipcRenderer.invoke('split:get-layout'),
+  onSplitLayout: (cb) => ipcRenderer.on('split:layout', (_e, layout) => cb(layout)),
   onState: (cb) => ipcRenderer.on('tabs:state', (_e, state) => cb(state)),
   onFocusAddress: (cb) => ipcRenderer.on('ui:focus-address', () => cb()),
   setChromeHeight: (px) => ipcRenderer.send('ui:chrome-height', px),

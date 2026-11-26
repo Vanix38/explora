@@ -1,6 +1,6 @@
 {
-  "name": "custom-nav",
-  "version": "1.0.0",
+  "name": "explora",
+  "version": "1.1.0",
   "description": "Navigateur de bureau perso pour passer facilement d'un moteur de recherche ou d'une IA à l'autre",
   "main": "src/main/main.js",
   "private": true,
@@ -16,10 +16,10 @@
     "electron": "^45.4.1",
     "electron-builder": "^26.18.0"
   },
-  "productName": "Custom Nav",
+  "productName": "Explora",
   "build": {
-    "appId": "com.vanix38.customnav",
-    "productName": "Custom Nav",
+    "appId": "com.vanix38.explora",
+    "productName": "Explora",
     "copyright": "Vanix38",
     "directories": {
       "output": "dist",
@@ -29,6 +29,9 @@
       "src/**/*",
       "build/icon.ico",
       "package.json"
+    ],
+    "asarUnpack": [
+      "src/devtools-ext/**"
     ],
     "win": {
       "target": [
@@ -48,10 +51,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "shortcutName": "Custom Nav",
-      "uninstallDisplayName": "Custom Nav",
+      "shortcutName": "Explora",
+      "uninstallDisplayName": "Explora",
       "deleteAppDataOnUninstall": false,
-      "artifactName": "Custom-Nav-Setup-${version}.${ext}"
+      "artifactName": "Explora-Setup-${version}.${ext}"
     }
   },
   "dependencies": {
@@ -60,6 +63,9 @@
     "@modelcontextprotocol/sdk": "^1.32.2",
     "electron-chrome-extensions": "^4.10.0",
     "electron-chrome-web-store": "^0.13.0",
+    "imapflow": "^2.12.2",
+    "mailparser": "^3.15.0",
+    "nodemailer": "^10.6.1",
     "zod": "^4.6.7"
   }
 }

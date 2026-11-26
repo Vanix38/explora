@@ -9,16 +9,26 @@ const history = require('./history');
 const bookmarks = require('./bookmarks');
 const extensions = require('./extensions');
 const adblock = require('./adblock');
+const resend = require('./resend');
 const mcp = require('./mcp');
 const translation = require('./translation');
+const googleLogin = require('./google-login');
+const passkeys = require('./passkeys');
+
+const mail = require('./mail');
+
+const { migrateUserData, upgradeLegacyUrl } = require('./migrate');
+
 
 // Hauteur initiale de l'interface ; l'interface envoie ensuite sa vraie hauteur.
 const CHROME_HEIGHT = 80;
 
-// Dossier des réglages et sessions : toujours %APPDATA%custom-nav, que l'app
-// soit lancée avec npm start ou installée (sinon productName « Custom Nav »
-// changerait le dossier et ferait perdre réglages et connexions).
-app.setPath('userData', path.join(app.getPath('appData'), 'custom-nav'));
+// Dossier des réglages et sessions : toujours %APPDATA%\Explora, que l'app
+// soit lancée avec npm start (nom du package « explora ») ou installée.
+app.setPath('userData', path.join(app.getPath('appData'), 'Explora'));
+// Ancien nom « Custom Nav » : copie %APPDATA%\custom-nav vers le nouveau dossier,
+// avant tout accès aux réglages ou aux partitions (cookies, connexions).
+migrateUserData(path.join(app.getPath('appData'), 'custom-nav'), app.getPath('userData'));
 
 const APP_ICON = path.join(__dirname, '..', '..', 'build', 'icon.ico');
 
@@ -26,13 +36,17 @@ const APP_ICON = path.join(__dirname, '..', '..', 'build', 'icon.ico');
 // Gemini…) refusent la connexion ou dégradent la page pour un UA Electron.
 app.userAgentFallback = app.userAgentFallback
   .replace(/\sElectron\/\S+/, '')
-  .replace(/\s(?:Custom Nav|custom-nav)\/\S+/gi, '');
+  .replace(/\sExplora\/\S+/gi, '');
+// Pages de connexion Google : user-agent Firefox (voir google-login.js).
+googleLogin.init();
+// Clés d'accès : pas de fenêtre Windows Hello en boucle (voir passkeys.js).
+passkeys.init();
 
-internal.registerScheme();
+internal.registerScheme([resend.schemePrivileges]);
 
 // Notifications Windows (WhatsApp, Discord…) : sans identifiant d'application,
 // les notifications ne s'affichent pas quand l'app est lancée depuis les sources.
-if (process.platform === 'win32') app.setAppUserModelId('com.vanix38.customnav');
+if (process.platform === 'win32') app.setAppUserModelId('com.vanix38.explora');
 
 // Une entrée par fenêtre ouverte : { win, tabs, isPrivate, partition }.
 // Il y a au plus une fenêtre normale (celle dont les onglets sont rouverts au
@@ -96,12 +110,31 @@ function resendTo(ctx, engineId, typed) {
   ctx.tabs.create({ ...buildEngineTarget(getEngine(engineId), query), query: query || null });
 }
 
+// Écran partagé : ouvre un panneau à droite (barre d'adresse prête, comme
+// pour un nouvel onglet), ou ferme l'écran partagé de l'onglet actif
+function toggleSplit(ctx) {
+  const wasSplit = !!ctx.tabs.splitOf(ctx.tabs.activeId);
+  ctx.tabs.toggleSplit();
+  if (!wasSplit) {
+    ctx.win.webContents.focus();
+    sendToUi(ctx, 'ui:focus-address');
+  }
+}
+
 function openSettings(ctx) {
   ctx.tabs.focusOrCreate(config.SETTINGS_PAGE);
 }
 
 function openHistory(ctx) {
   ctx.tabs.focusOrCreate(config.HISTORY_PAGE);
+}
+
+// Client mail : toujours dans la fenêtre normale (pas de courrier en navigation privée)
+function openMail(ctx) {
+  const target = ctx && !ctx.isPrivate ? ctx : createWindow({ restore: false });
+  target.tabs.focusOrCreate(mail.PAGE);
+  if (target.win.isMinimized()) target.win.restore();
+  target.win.focus();
 }
 
 function newTab(ctx) {
@@ -221,6 +254,8 @@ function runShortcut(ctx, event, input) {
     } else {
       setActiveEngine(engines[digit].id);
     }
+  } else if (ctrl && input.shift && key === 's') {
+    toggleSplit(ctx);
   } else if (ctrl && input.shift && key === 'm') {
     messengers.toggleRail();
   } else if (ctrl && input.shift && key === 'n') {
@@ -244,6 +279,8 @@ function runShortcut(ctx, event, input) {
     sendToUi(ctx, 'ui:focus-address');
   } else if (ctrl && key === ',') {
     openSettings(ctx);
+  } else if (ctrl && input.shift && key === 'e') {
+    openMail(ctx);
   } else if (ctrl && !input.shift && key === 'h') {
     openHistory(ctx);
   } else if (key === 'f5' || (ctrl && key === 'r')) {
@@ -280,7 +317,7 @@ function saveSessionNow() {
 
 function openInitialTabs(ctx, restore) {
   const last = restore && config.getConfig().restoreTabs ? config.getLastSession() : null;
-  const saved = (last?.tabs || []).filter((t) => isHttpUrl(t.url) || internal.isInternalUrl(t.url));
+  const saved = (last?.tabs || []).map((t) => ({ ...t, url: upgradeLegacyUrl(t.url) })).filter((t) => isHttpUrl(t.url) || internal.isInternalUrl(t.url));
   if (saved.length === 0) {
     newTab(ctx);
     return;
@@ -291,8 +328,15 @@ function openInitialTabs(ctx, restore) {
     const members = ids.filter((_id, i) => saved[i].group === gi);
     if (members.length && g) ctx.tabs.createGroup(members, { title: g.title || '', color: g.color, collapsed: !!g.collapsed });
   });
+  // indices de l'enregistrement -> onglets rouverts (les adresses invalides sont sautées)
+  const byIndex = new Map(saved.map((t, i) => [last.tabs.indexOf(t), ids[i]]));
+  // écrans partagés
+  for (const sp of Array.isArray(last.splits) ? last.splits : []) {
+    if (!Array.isArray(sp?.tabs)) continue;
+    ctx.tabs.restoreSplit(sp.tabs.map((i) => byIndex.get(i)).filter(Boolean), sp.sizes);
+  }
   // l'onglet actif : de préférence un onglet visible (hors groupe replié)
-  let active = ids[Math.min(last.active || 0, ids.length - 1)];
+  let active = byIndex.get(last.active || 0) ?? ids[ids.length - 1];
   if (!ctx.tabs.isVisible(active)) active = ids.find((id) => ctx.tabs.isVisible(id)) ?? active;
   ctx.tabs.activate(active);
 }
@@ -340,7 +384,7 @@ function createWindow({ isPrivate = false, restore = true } = {}) {
     height: 820,
     minWidth: 600,
     minHeight: 400,
-    title: isPrivate ? 'Custom Nav – Navigation privée' : 'Custom Nav',
+    title: isPrivate ? 'Explora – Navigation privée' : 'Explora',
     icon: APP_ICON,
     backgroundColor: windowBackground(isPrivate),
     autoHideMenuBar: true,
@@ -371,10 +415,11 @@ function createWindow({ isPrivate = false, restore = true } = {}) {
       if (!devtools) {
         handleContextMenu(wc); // les outils ont leur propre clic droit
         translation.attach(wc);
-      }
+      } else resend.attachDevTools(wc);
     },
   });
   adblock.addSession(session.fromPartition(partition)); // pubs bloquées aussi en privé
+  resend.addSession(session.fromPartition(partition)); // onglet « Renvoyer » des DevTools
   const ctx = { win, tabs, isPrivate, partition };
   windows.add(ctx);
   if (!isPrivate) mainCtx = ctx;
@@ -383,6 +428,9 @@ function createWindow({ isPrivate = false, restore = true } = {}) {
     sendToUi(ctx, 'tabs:state', state);
     if (!isPrivate) saveSessionSoon();
   });
+  // écran partagé : l'interface dessine les séparateurs entre les pages
+  tabs.on('split-layout', (layout) => sendToUi(ctx, 'split:layout', layout));
+  if (!isPrivate) tabs.on('split-resized', saveSessionSoon);
   // Les onglets de la session normale sont visibles des extensions (chrome.tabs)
   tabs.on('tab-created', (tab) => extensions.addTab(tab.view.webContents, win));
   tabs.on('tab-activated', (tab) => extensions.selectTab(tab.view.webContents));
@@ -478,6 +526,21 @@ ipcMain.on('tabs:context-menu', fromUi((ctx, id, x, y) => {
       }]
     : [{ label: "Ajouter l'onglet à un nouveau groupe", click: newGroup }];
   if (tab.groupId) groupItems.push({ label: 'Retirer du groupe', click: () => tabs.removeFromGroup([id]) });
+  // écran partagé
+  const split = [];
+  const group = tabs.splitOf(id);
+  if (id !== tabs.activeId && tabs.canSplitWith(id)) {
+    split.push({ label: "Afficher à côté de l'onglet actif", click: () => tabs.splitWith(id) });
+  }
+  if (group) {
+    split.push(
+      { label: "Retirer de l'écran partagé", click: () => tabs.removeFromSplit(id) },
+      { label: 'Inverser les panneaux', click: () => tabs.swapSplit(id) },
+      { label: "Fermer l'écran partagé", click: () => tabs.unsplit(id) },
+    );
+  } else if (id === tabs.activeId) {
+    split.push({ label: 'Ouvrir un écran partagé', accelerator: 'Ctrl+Shift+S', click: () => toggleSplit(ctx) });
+  }
   Menu.buildFromTemplate([
     { label: 'Nouvel onglet', click: () => newTab(ctx) },
     { label: 'Recharger', click: () => tab.view.webContents.reload() },
@@ -485,6 +548,7 @@ ipcMain.on('tabs:context-menu', fromUi((ctx, id, x, y) => {
     { type: 'separator' },
     ...groupItems,
     { type: 'separator' },
+    ...(split.length ? [...split, { type: 'separator' }] : []),
     { label: 'Fermer', accelerator: 'Ctrl+W', click: () => tabs.close(id) },
     { label: 'Fermer les autres onglets', enabled: others.length > 0, click: () => { tabs.closeMany(others); tabs.activate(id); } },
     { label: 'Fermer les onglets à droite', enabled: right.length > 0, click: () => tabs.closeMany(right) },
@@ -540,6 +604,13 @@ ipcMain.on('groups:context-menu', fromUi((ctx, gid, x, y) => {
   ], x, y);
 }));
 
+// Écran partagé : bouton de la barre d'outils et séparateurs
+ipcMain.on('split:toggle', fromUi((ctx) => toggleSplit(ctx)));
+ipcMain.on('split:resize-start', fromUi(({ tabs }, index) => {
+  if (Number.isInteger(index)) tabs.startResize(index);
+}));
+ipcMain.on('split:reset', fromUi(({ tabs }) => tabs.resetSplitSizes()));
+ipcMain.handle('split:get-layout', fromUi(({ tabs }) => tabs.splitLayout));
 ipcMain.on('nav:go', fromUi(({ tabs }, input) => tabs.navigate(resolveInput(input, activeEngineId()))));
 ipcMain.on('nav:back', fromUi(({ tabs }) => tabs.goBack()));
 ipcMain.on('nav:forward', fromUi(({ tabs }) => tabs.goForward()));
@@ -562,9 +633,11 @@ ipcMain.on('ui:app-menu', fromUi((ctx, x, y) => {
   Menu.buildFromTemplate([
     { label: 'Nouvel onglet', accelerator: 'Ctrl+T', click: () => newTab(ctx) },
     { label: 'Nouvelle fenêtre privée', accelerator: 'Ctrl+Shift+N', click: () => createWindow({ isPrivate: true }) },
+    { label: 'Écran partagé', type: 'checkbox', checked: !!ctx.tabs.splitOf(ctx.tabs.activeId), accelerator: 'Ctrl+Shift+S', click: () => toggleSplit(ctx) },
     { type: 'separator' },
     { label: 'Historique', accelerator: 'Ctrl+H', click: () => openHistory(ctx) },
     { label: 'Favoris', accelerator: 'Ctrl+Shift+O', click: () => openBookmarksManager(ctx) },
+    { label: mail.totalUnseen() ? `Courrier (${mail.totalUnseen()} non lus)` : 'Courrier', accelerator: 'Ctrl+Shift+E', click: () => openMail(ctx) },
     { label: 'Extensions', click: () => ctx.tabs.focusOrCreate(config.EXTENSIONS_PAGE) },
     translatePageItem(ctx),
     ...(ctx.isPrivate ? [] : [{ label: 'Barre latérale', accelerator: 'Ctrl+Shift+M', click: () => messengers.toggleRail() }]),
@@ -683,7 +756,7 @@ const INTERNAL_ACTIONS = {
   'history-list': (opts) => history.list(opts || {}),
   'history-remove': (ids) => history.remove(ids),
   'history-clear': (range) => history.clear(range),
-  // gestionnaire de favoris (customnav://bookmarks/)
+  // gestionnaire de favoris (explora://bookmarks/)
   'bookmarks-get': () => bookmarksState(),
   'bookmarks-add-link': (data) => bookmarks.addLink(data),
   'bookmarks-add-folder': (data) => bookmarks.addFolder(data),
@@ -693,7 +766,7 @@ const INTERNAL_ACTIONS = {
   'bookmarks-import-sources': () => bookmarks.importSources(),
   'bookmarks-import': (browserId) => bookmarks.importFrom(browserId),
   'bookmarks-set-show-bar': (on) => config.setShowBookmarksBar(on),
-  // extensions (customnav://extensions/)
+  // extensions (explora://extensions/)
   'extensions-list': () => extensions.list(),
   'extensions-remove': (id) => extensions.remove(String(id)),
   'extensions-update': () => extensions.checkUpdates(),
@@ -779,7 +852,7 @@ ipcMain.handle('internal', async (event, action, ...args) => {
   return result;
 });
 
-// --- Extensions : ce que chrome.tabs / chrome.windows font dans Custom Nav ---
+// --- Extensions : ce que chrome.tabs / chrome.windows font dans Explora ---
 function tabFromWebContents(wc) {
   const ctx = ctxFor(wc);
   const tab = ctx?.tabs.tabFor(wc);
@@ -829,6 +902,7 @@ function handleContextMenu(webContents) {
     if (params.linkURL && isHttpUrl(params.linkURL)) {
       items.push(
         { label: 'Ouvrir le lien dans un nouvel onglet', click: () => ctx.tabs.create(params.linkURL, { activate: false }) },
+        { label: "Ouvrir le lien dans l'écran partagé", click: () => ctx.tabs.openInSplit(params.linkURL, ctx.tabs.tabFor(webContents)?.id ?? ctx.tabs.activeId) },
         { label: "Copier l'adresse du lien", click: () => clipboard.writeText(params.linkURL) },
       );
     }
@@ -900,6 +974,17 @@ app.whenReady().then(async () => {
     },
     onStatus: translationChanged,
   });
+
+  // clic sur une notification de nouveau message : ouvre la page Courrier
+  mail.init({ openPage: () => openMail(mainCtx) });
+
+  // onglet « Renvoyer » des outils de développement (modifier et renvoyer une requête)
+  await resend.init({
+    isTab: (wc) => {
+      const tab = ctxFor(wc)?.tabs.tabFor(wc);
+      return !!tab && tab.view.webContents === wc;
+    },
+  });
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -909,6 +994,7 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   history.saveNow();
   translation.stop();
+  mail.shutdown();
 });
 
 app.on('window-all-closed', () => {

@@ -35,7 +35,7 @@
     <section>
       <h2>Page d'accueil</h2>
       <label class="radio"><input type="radio" name="home-mode" value="internal" />
-        Page d'accueil Custom Nav (recherche + raccourcis)</label>
+        Page d'accueil Explora (recherche + raccourcis)</label>
       <label class="radio"><input type="radio" name="home-mode" value="url" />
         Une adresse :</label>
       <div class="row indent">
@@ -45,7 +45,7 @@
       <p class="status" id="home-status" role="status"></p>
 
       <h3>Raccourcis de la page d'accueil</h3>
-      <p class="help">Les tuiles affichées sous la recherche. Les vrais favoris (étoile, barre de favoris) se gèrent dans <a href="customnav://bookmarks/">Favoris</a> (<kbd>Ctrl+Shift+O</kbd>).</p>
+      <p class="help">Les tuiles affichées sous la recherche. Les vrais favoris (étoile, barre de favoris) se gèrent dans <a href="explora://bookmarks/">Favoris</a> (<kbd>Ctrl+Shift+O</kbd>).</p>
       <div id="fav-list"></div>
       <div class="row actions">
         <button type="button" id="fav-add">+ Ajouter un raccourci</button>
@@ -132,7 +132,7 @@
     <section id="mcp-section">
       <h2>Pilotage par une IA (MCP)</h2>
       <label class="check"><input type="checkbox" id="mcp-enabled" />
-        Autoriser une IA (Claude Code, Claude Desktop…) à piloter Custom Nav</label>
+        Autoriser une IA (Claude Code, Claude Desktop…) à piloter Explora</label>
       <p class="help">Un serveur <a href="https://modelcontextprotocol.io/">MCP</a> local permet à l'IA de lister,
         ouvrir et fermer des onglets, naviguer, lire le texte des pages, faire des captures, cliquer et remplir des
         champs, et chercher avec tes moteurs et IA. Il n'écoute que sur ton PC (127.0.0.1), exige le jeton
@@ -160,7 +160,7 @@
         Rouvrir les onglets du dernier lancement</label>
       <p class="help">Les connexions aux sites (cookies) sont toujours conservées entre les lancements.
         L'historique des pages visitées (hors navigation privée) se gère dans la page
-        <a href="customnav://history/">Historique</a> (<kbd>Ctrl+H</kbd>).</p>
+        <a href="explora://history/">Historique</a> (<kbd>Ctrl+H</kbd>).</p>
       <div class="row">
         <button type="button" id="clear-data" class="danger">Effacer les données de navigation…</button>
       </div>

@@ -1,23 +1,29 @@
-# Custom Nav
+# Explora
 
 Navigateur de bureau perso (Windows), fait maison avec [Electron](https://www.electronjs.org/).
 Objectif : passer très facilement d'un moteur de recherche ou d'une IA (Claude, etc.) à l'autre.
 
 ## Installer / mettre à jour
 
-1. Générer l'installeur (voir ci-dessous) ou récupérer `dist/Custom-Nav-Setup-<version>.exe`.
+1. Générer l'installeur (voir ci-dessous) ou récupérer `dist/Explora-Setup-<version>.exe`.
 2. Lancer l'installeur. L'installation se fait **pour l'utilisateur courant, sans droits
    administrateur** ; le dossier est modifiable (par défaut
-   `%LOCALAPPDATA%ProgramsCustom Nav`). Raccourcis créés sur le Bureau et dans le menu Démarrer.
+   `%LOCALAPPDATA%ProgramsExplora`). Raccourcis créés sur le Bureau et dans le menu Démarrer.
 3. **Windows SmartScreen** peut avertir au premier lancement de l'installeur, car il n'est pas signé
    (usage perso) : cliquer sur **« Informations complémentaires »** puis **« Exécuter quand même »**.
 
 Pour **mettre à jour**, relancer simplement l'installeur d'une version plus récente par-dessus.
 
-Les réglages, onglets et connexions sont dans `%APPDATA%custom-nav` : ils sont conservés lors
-des mises à jour **et** de la désinstallation (Paramètres Windows > Applications > Custom Nav, ou
-`Uninstall Custom Nav.exe` dans le dossier d'installation). Pour repartir de zéro, supprimer ce
+Les réglages, onglets et connexions sont dans `%APPDATA%\Explora` : ils sont conservés lors
+des mises à jour **et** de la désinstallation (Paramètres Windows > Applications > Explora, ou
+`Uninstall Explora.exe` dans le dossier d'installation). Pour repartir de zéro, supprimer ce
 dossier à la main après désinstallation. Le même dossier est utilisé par `npm start`.
+
+**Ancien nom « Custom Nav »** : au premier lancement d'Explora, le dossier `%APPDATA%\custom-nav` est
+copié vers `%APPDATA%\Explora` (réglages, onglets, favoris, connexions) ; l'ancien dossier est laissé
+en place comme sauvegarde. Les anciennes adresses `customnav://…` ouvrent la page `explora://…`
+correspondante. L'identifiant de l'app ayant changé, désinstaller « Custom Nav » à la main
+(Paramètres Windows > Applications).
 
 ### Générer l'installeur
 
@@ -26,11 +32,14 @@ npm install
 npm run dist
 ```
 
-Résultat : `dist/Custom-Nav-Setup-<version>.exe` (NSIS, Windows x64, via
+Résultat : `dist/Explora-Setup-<version>.exe` (NSIS, Windows x64, via
 [electron-builder](https://www.electron.build/)). Le dossier `dist/` n'est pas versionné.
 
-L'icône est générée depuis `build/icon.svg` : après l'avoir modifiée, `npm run icon` régénère
-`build/icon.ico` (multi-tailles) et `build/icon.png`.
+Les logos sont dans `assets/brand/` en SVG (sources de référence) et en PNG : versions fond
+clair / fond sombre, avec ou sans le texte « Explora ». L'icône de l'app est générée depuis
+`assets/brand/logo-fond-clair.svg` : après l'avoir modifié, `npm run icon` régénère
+`build/icon.ico` (multi-tailles) et `build/icon.png`. La page d'accueil affiche
+`src/internal/img/logo-full-*.svg` (copies des logos complets) selon le thème clair ou sombre.
 
 ## Lancer depuis les sources
 
@@ -62,7 +71,44 @@ npm start
 - Historique (`Ctrl+H`, menu ☰ ou lien en bas de la page d'accueil) : pages visitées groupées par jour, recherche, suppression d'une page, d'une sélection ou d'une période. Rien n'est enregistré en navigation privée ; conservé 90 jours dans `history.json`
 - Outils de développement (les DevTools de Chrome) ancrés à droite de la page : `F12`, `Ctrl+Shift+I`,
   menu ☰, ou clic droit > « Inspecter l'élément »
+- Onglet « Renvoyer » dans les outils de développement : modifier une requête réseau (méthode, URL,
+  en-têtes, corps) et la renvoyer, comme « Modifier et renvoyer » de Firefox, voir ci-dessous
 - Favoris : étoile dans la barre d'adresse, barre de favoris, dossiers, import depuis Chrome / Edge / Brave, voir ci-dessous
+- **Écran partagé** : plusieurs onglets côte à côte dans la fenêtre (jusqu'à 4), par exemple Google
+  d'un côté et Google Sheets de l'autre, voir ci-dessous
+
+### Écran partagé
+
+- Bouton **▯▯** de la barre d'outils, `Ctrl+Shift+S` ou menu ☰ > « Écran partagé » : ouvre un nouveau
+  panneau à droite de l'onglet courant (la barre d'adresse est prête pour taper l'adresse ou la recherche).
+  Même bouton / raccourci pour fermer l'écran partagé : les onglets restent ouverts, séparément.
+- Clic droit sur un autre onglet > « Afficher à côté de l'onglet actif » : le met dans l'écran partagé
+  (jusqu'à 4 panneaux). Clic droit sur un lien > « Ouvrir le lien dans l'écran partagé ».
+- Le panneau actif (entouré d'un liseré) est celui que pilotent la barre d'adresse, Précédent, Recharger,
+  les pastilles moteurs / IA… : il suffit de cliquer dans un panneau pour le rendre actif.
+- **Séparateur** entre les panneaux : glisser pour redimensionner, double-clic pour des parts égales.
+- Dans la barre d'onglets, les onglets d'un écran partagé sont collés et soulignés d'un trait de couleur ;
+  cliquer sur l'un d'eux réaffiche tout l'écran partagé. Clic droit : retirer de l'écran partagé,
+  inverser les panneaux, fermer l'écran partagé.
+- Les écrans partagés (et la taille des panneaux) sont rouverts au lancement suivant avec les onglets.
+
+### Modifier et renvoyer une requête
+
+Les DevTools de Chrome n'ont pas « Modifier et renvoyer » (Firefox l'a) : Explora ajoute un onglet
+**Renvoyer** aux outils de développement (`F12`, puis l'onglet « Renvoyer », éventuellement derrière `»`).
+
+- La liste montre les requêtes de la page depuis l'ouverture des outils (rechargez la page pour voir les
+  premières). Un clic charge la requête dans l'éditeur ; « Nouvelle » part d'une requête vide.
+- Méthode, URL, en-têtes (un par ligne, `Nom: valeur`, `#` pour désactiver une ligne) et corps sont
+  modifiables. `Ctrl+Entrée` ou « Envoyer » renvoie la requête ; la réponse (statut, durée, en-têtes,
+  corps, JSON mis en forme) s'affiche en dessous.
+- **Depuis le navigateur** (par défaut, comme Firefox) : envoyée avec la session de l'onglet, cookies
+  compris, sans restriction CORS. Un en-tête `Cookie` saisi remplace les cookies de la session.
+  `Host`, `Origin`, `Content-Length`, `Sec-Fetch-*`… restent gérés par le navigateur.
+- **Depuis la page** : `fetch()` exécuté dans la page, la requête apparaît dans l'onglet Réseau, mais
+  CORS s'applique et les en-têtes interdits aux pages (`Cookie`, `Referer`, `Origin`…) sont ignorés.
+
+Fonctionne aussi en navigation privée (avec les cookies de la fenêtre privée).
 
 ### Favoris
 
@@ -72,7 +118,7 @@ npm start
   ouvrir dans l'onglet courant, `Ctrl+clic` ou clic molette pour un nouvel onglet, clic sur un dossier
   pour son menu (sous-dossiers, « Tout ouvrir »), clic droit pour ouvrir / supprimer / gérer. Les favoris
   qui ne tiennent pas dans la largeur passent dans le menu **»**.
-- **Gestionnaire** (`Ctrl+Shift+O`, ou « ★ Favoris » sur la page d'accueil, `customnav://bookmarks/`) :
+- **Gestionnaire** (`Ctrl+Shift+O`, ou « ★ Favoris » sur la page d'accueil, `explora://bookmarks/`) :
   recherche, renommer, changer l'adresse, créer des dossiers (imbriqués), déplacer, réordonner, supprimer.
   Tout est enregistré immédiatement dans `settings.json` (clé `bookmarks`).
 - **Import** depuis Google Chrome, Microsoft Edge ou Brave (profil par défaut, s'il est installé) : copie
@@ -94,7 +140,7 @@ listes EasyList, EasyPrivacy, filtres uBlock Origin, Peter Lowe et Liste FR :
   bloqueurs), désactiver le bloqueur partout, ou ouvrir ses réglages ;
 - dans les réglages (section « Bloqueur de publicités ») : activer / désactiver, liste des sites autorisés,
   mise à jour manuelle des listes. Les listes sont téléchargées au premier lancement, compilées et mises en
-  cache dans `%APPDATA%\custom-nav\adblock-engine.bin`, puis rafraîchies tous les 3 jours. Sans réseau, le
+  cache dans `%APPDATA%\Explora\adblock-engine.bin`, puis rafraîchies tous les 3 jours. Sans réseau, le
   cache existant est utilisé.
 
 Limites : certains sites détectent les bloqueurs et demandent de les désactiver ; les pubs YouTube
@@ -128,7 +174,7 @@ La qualité est un peu en dessous de DeepL ou Google ; la traduction tourne dans
 
 ### Pilotage par une IA (serveur MCP)
 
-Custom Nav contient un serveur [MCP](https://modelcontextprotocol.io/) pour qu'une IA comme Claude (Claude Code,
+Explora contient un serveur [MCP](https://modelcontextprotocol.io/) pour qu'une IA comme Claude (Claude Code,
 Claude Desktop…) puisse piloter le navigateur. **Désactivé par défaut** : Paramètres > « Pilotage par une IA
 (MCP) ». Une fois activé, la page affiche la commande à copier pour Claude Code et le bloc de configuration pour
 Claude Desktop (via `mcp-remote`, qui nécessite Node.js).
@@ -145,16 +191,16 @@ n'active le serveur que pour une IA en qui tu as confiance.
 
 ### Extensions Chrome
 
-Le bouton pièce de puzzle (à droite de la barre d'adresse) ouvre `customnav://extensions/` : liste des
+Le bouton pièce de puzzle (à droite de la barre d'adresse) ouvre `explora://extensions/` : liste des
 extensions installées, options, suppression, recherche de mises à jour, et un lien vers le Chrome Web Store.
 
-- Sur le **Chrome Web Store**, le bouton « Ajouter à Chrome » (affiché « Ajouter à Custom Nav » ou similaire)
+- Sur le **Chrome Web Store**, le bouton « Ajouter à Chrome » (affiché « Ajouter à Explora » ou similaire)
   installe l'extension après une confirmation qui résume ses autorisations. Le Store affiche aussi un bandeau
   « Passez à Chrome » : il peut être ignoré. Seules les extensions **Manifest V3** sont acceptées.
 - Les boutons des extensions apparaissent à droite de la barre d'adresse (clic = popup de l'extension).
 - Les éléments ajoutés au **clic droit** par les extensions apparaissent dans le menu contextuel des pages
   (qui propose aussi : ouvrir le lien dans un nouvel onglet, copier, coller, inspecter…).
-- Mises à jour automatiques au lancement puis toutes les 5 heures. Fichiers dans `%APPDATA%\custom-nav\Extensions`.
+- Mises à jour automatiques au lancement puis toutes les 5 heures. Fichiers dans `%APPDATA%\Explora\Extensions`.
 - **Aucune extension en navigation privée.**
 
 Tout repose sur [electron-chrome-extensions](https://github.com/samuelmaddock/electron-browser-shell) et
@@ -181,7 +227,7 @@ d'onglets et au titre de la fenêtre.
   partagés avec la fenêtre normale ni avec les autres fenêtres privées, et sont vidés dès la
   fermeture de la fenêtre.
 - Ses onglets ne sont **pas enregistrés** ni rouverts au lancement suivant (seule la fenêtre normale
-  l'est). Les nouveaux onglets privés ouvrent toujours la page d'accueil Custom Nav.
+  l'est). Les nouveaux onglets privés ouvrent toujours la page d'accueil Explora.
 - Les réglages (moteur actif, liste des moteurs, thème…) restent communs : les modifier depuis une
   fenêtre privée les enregistre comme d'habitude.
 - `Ctrl+N` ramène la fenêtre normale (ou la rouvre si elle a été fermée).
@@ -211,7 +257,7 @@ Une barre verticale à gauche de la fenêtre normale affiche une icône par int�
 - réordonner (▲ ▼), renommer, changer l'adresse, la largeur du panneau, activer / désactiver,
   afficher ou non le badge de non-lus, retirer (efface aussi les données de connexion).
 
-La liste est enregistrée dans `%APPDATA%\custom-nav\messengers.json` (icônes comprises).
+La liste est enregistrée dans `%APPDATA%\Explora\messengers.json` (icônes comprises).
 
 Les intégrations activées restent chargées en arrière-plan (panneau fermé) pour recevoir messages et
 notifications ; une intégration désactivée ne consomme plus rien. Chacune a sa propre session
@@ -221,6 +267,44 @@ dans une intégration s'ouvrent dans un onglet normal. La barre n'existe pas dan
 
 Première connexion : WhatsApp demande de scanner un QR code avec le téléphone (WhatsApp >
 Appareils connectés), Discord se connecte par e-mail / mot de passe ou QR code.
+
+### Courrier (client mail intégré)
+
+Un vrai client mail façon Thunderbird, dans un onglet : menu ☰ > **Courrier** ou `Ctrl+Shift+E`
+(page `customnav://mail/`).
+
+- **Plusieurs comptes IMAP / SMTP** : on saisit l'adresse et le mot de passe, les serveurs sont trouvés
+  tout seuls (fournisseurs courants : Gmail, Yahoo, iCloud, Free, Orange, SFR, La Poste, GMX, Fastmail,
+  Proton Bridge ; sinon la base de Thunderbird, sinon `imap.<domaine>` / `smtp.<domaine>`), modifiables
+  dans « Serveurs ». La connexion est testée (réception et envoi) avant d'enregistrer.
+- **Gmail, Yahoo, iCloud** : il faut un *mot de passe d'application* (ex. Gmail :
+  myaccount.google.com/apppasswords, validation en deux étapes activée). **Outlook / Hotmail** n'accepte
+  plus que la connexion OAuth, pas encore prise en charge : utiliser l'intégration Outlook de la barre
+  latérale en attendant.
+- Dossiers (réception, envoyés, brouillons, corbeille… et sous-dossiers) avec le nombre de non-lus,
+  liste des messages (50 par page, « Charger plus »), lecture, pièces jointes (Ouvrir / Enregistrer).
+- **Rédaction** en texte brut : nouveau message, répondre, répondre à tous, transférer (avec les pièces
+  jointes d'origine), Cc / Cci, pièces jointes, signature par compte. Le message envoyé est rangé dans
+  « Envoyés » (Gmail et Outlook le font eux-mêmes).
+- Actions : étoile, marquer non lu, déplacer vers un dossier, supprimer (corbeille).
+- **Recherche** dans le dossier courant (objet, expéditeur, destinataire, texte), faite par le serveur.
+- **Nouveaux messages** : vérifiés en direct (IDLE) et toutes les 2 minutes, même page fermée ;
+  notification Windows (désactivable par compte), clic = ouvre le message. Le nombre de non-lus
+  s'affiche dans le titre de l'onglet et dans le menu ☰.
+- Raccourcis dans la page : `N` nouveau, `R` répondre, `A` répondre à tous, `F` transférer,
+  `Suppr` supprimer, `S` étoile, `U` non lu, `↑` / `↓` (ou `K` / `J`) message précédent / suivant,
+  `/` rechercher, `Ctrl+Entrée` envoyer, `Échap` fermer.
+
+Sécurité et vie privée :
+
+- les mots de passe sont chiffrés par Windows (`safeStorage`, DPAPI) dans
+  `%APPDATA%\custom-nav\mail-accounts.json` et ne sont jamais renvoyés à la page ;
+- les messages HTML s'affichent dans un cadre isolé **sans aucun script** ni formulaire ; les
+  **images distantes sont bloquées** (pixels espions) jusqu'au clic sur « Afficher les images » ;
+  les liens s'ouvrent dans un nouvel onglet ;
+- la page ne manipule que des identifiants (compte, dossier, n° de message, jeton de pièce jointe),
+  jamais de chemin de fichier ; seuls les types de fichiers sans risque s'ouvrent directement ;
+- pas de courrier dans les fenêtres privées.
 
 ### Sélecteur moteurs de recherche / IA
 
@@ -249,15 +333,15 @@ Le user-agent envoyé aux sites est celui d'un Chrome standard (sans « Electron
 
 ### Réglages
 
-Ouverts dans un onglet (`customnav://settings/`), enregistrés dans `settings.json` du dossier
-utilisateur de l'app (`%APPDATA%custom-navsettings.json`).
+Ouverts dans un onglet (`explora://settings/`), enregistrés dans `settings.json` du dossier
+utilisateur de l'app (`%APPDATA%\Explora\settings.json`).
 
 - **Moteurs de recherche et IA** : ajouter (nom, URL avec `{q}` ou `%s` à la place de la question,
   catégorie moteur / IA, option « Injection dans la page » avec un sélecteur CSS facultatif),
   modifier, supprimer, réordonner avec ▲ ▼ (l'ordre définit `Ctrl+1` … `Ctrl+9`), choisir le moteur
   par défaut, puis **Enregistrer**. « Réinitialiser la liste » (à confirmer d'un 2e clic) remet la
   liste d'origine. Seules les URL `http://` et `https://` sont acceptées.
-- **Page d'accueil** : la page Custom Nav, ou une adresse de ton choix. Les **favoris** affichés sur la
+- **Page d'accueil** : la page Explora, ou une adresse de ton choix. Les **favoris** affichés sur la
   page d'accueil sont éditables.
 - **Apparence** : suivre Windows, clair ou sombre. Le choix s'applique à l'interface, aux pages internes
   et est transmis aux sites (`prefers-color-scheme`).
@@ -270,6 +354,7 @@ utilisateur de l'app (`%APPDATA%custom-navsettings.json`).
 | --- | --- |
 | `Ctrl+T` | Nouvel onglet |
 | `Ctrl+Shift+N` | Nouvelle fenêtre privée |
+| `Ctrl+Shift+S` | Ouvrir / fermer l'écran partagé |
 | `F12` / `Ctrl+Shift+I` | Outils de développement |
 | `Ctrl+D` | Ajouter / retirer la page des favoris |
 | `Ctrl+Shift+B` | Afficher / masquer la barre de favoris |
@@ -280,6 +365,7 @@ utilisateur de l'app (`%APPDATA%custom-navsettings.json`).
 | `Ctrl+L` | Aller à la barre d'adresse |
 | `Ctrl+,` | Réglages |
 | `Ctrl+H` | Historique |
+| `Ctrl+Shift+E` | Courrier |
 | `F5` / `Ctrl+R` | Recharger |
 | `Alt+←` / `Alt+→` | Précédent / suivant |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Onglet suivant / précédent |
@@ -301,22 +387,26 @@ src/
     adblock.js   bloqueur de pub intégré (moteur Ghostery, toutes les sessions)
     mcp.js       serveur MCP local (pilotage par une IA, fenêtre normale uniquement)
     settings.js  lecture / écriture de settings.json
-    internal.js  protocole customnav:// des pages internes
+    internal.js  protocole explora:// des pages internes
     messengers.js  barre latérale : catalogue, liste personnalisable, panneaux
     translation/   traduction locale (Bergamot) : index.js (pages, sélection, menu), models.js
                    (téléchargement des modèles), engine.js + worker.js (processus de traduction),
                    languages.js (détection de la langue), content/ (scripts injectés dans les pages)
+    mail.js      client mail : comptes, IMAP (imapflow), SMTP (nodemailer), notifications
+    mail-providers.js  réglages IMAP / SMTP devinés à partir de l'adresse
   preload/
     ui-preload.js        API de l'interface (barre d'onglets / d'outils)
-    internal-preload.js  API des pages internes (n'existe que sur customnav://)
+    internal-preload.js  API des pages internes (n'existe que sur explora://)
     messengers-rail-preload.js  API de la barre des messageries
     messenger-preload.js  retour au panneau au clic sur une notification
   renderer/
     index.html, styles.css, renderer.js   interface (onglets, barre d'outils)
     messengers.html, .css, .js            barre des messageries
   internal/
-    home.*, settings.*, bookmarks.*, extensions.*, common.css   pages internes
-build/        icône (icon.svg source, icon.ico, icon.png)
+    home.*, settings.*, bookmarks.*, extensions.*, mail.*, common.css   pages internes
+    img/                                  logos de la page d'accueil
+assets/brand/ logos sources (SVG et PNG transparents)
+build/        icône de l'app (icon.ico, icon.png)
 scripts/      make-icon.js (génération de l'icône)
 ```
 
@@ -325,9 +415,9 @@ Sécurité :
 - les pages web tournent sans accès à Node (`nodeIntegration: false`, `contextIsolation: true`,
   `sandbox: true`) ; seule l'interface (fichier local `index.html`, qui ne peut pas naviguer ailleurs) a un
   preload non sandboxé, pour charger les boutons d'extensions ;
-- l'API des réglages (`window.customNav`) n'est exposée qu'aux pages `customnav://`, et le processus
+- l'API des réglages (`window.customNav`) n'est exposée qu'aux pages `explora://`, et le processus
   principal vérifie à chaque message que l'expéditeur est bien une page interne (cadre principal) ;
-- un site web ne peut pas ouvrir une page `customnav://` (navigation, redirection, cadre ou
+- un site web ne peut pas ouvrir une page `explora://` (navigation, redirection, cadre ou
   `window.open` sont bloqués).
 
 ## Feuille de route

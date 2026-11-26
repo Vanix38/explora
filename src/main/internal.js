@@ -1,22 +1,27 @@
+
 // Pages internes (accueil, réglages) servies par le protocole customnav://
 //   customnav://home/      -> src/internal/home.html
 //   customnav://settings/  -> src/internal/settings.html
 //   customnav://history/   -> src/internal/history.html
 //   customnav://bookmarks/ -> src/internal/bookmarks.html
 //   customnav://extensions/ -> src/internal/extensions.html
+//   customnav://mail/       -> src/internal/mail.html (client mail)
 //   customnav://<page>/x   -> src/internal/x (css, js partagés)
+
 const path = require('path');
 const { pathToFileURL } = require('url');
 const { protocol, net } = require('electron');
 
-const SCHEME = 'customnav';
+const SCHEME = 'explora';
 const ROOT = path.join(__dirname, '..', 'internal');
-const PAGES = new Set(['home', 'settings', 'history', 'bookmarks', 'extensions']);
+const PAGES = new Set(['home', 'settings', 'history', 'bookmarks', 'extensions', 'mail']);
 
-// À appeler avant app.whenReady()
-function registerScheme() {
+// À appeler avant app.whenReady(), une seule fois : `extra` ajoute les autres
+// schémas de l'app (registerSchemesAsPrivileged remplace la liste à chaque appel)
+function registerScheme(extra = []) {
   protocol.registerSchemesAsPrivileged([
     { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
+    ...extra,
   ]);
 }
 

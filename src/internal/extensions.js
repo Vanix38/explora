@@ -1,4 +1,4 @@
-// Page customnav://extensions/ : liste, options, suppression, mises à jour.
+// Page explora://extensions/ : liste, options, suppression, mises à jour.
 const api = window.customNav.extensions;
 const $ = (id) => document.getElementById(id);
 

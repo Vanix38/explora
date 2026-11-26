@@ -1,32 +1,38 @@
-// Génère build/icon.ico (multi-tailles) et build/icon.png à partir de build/icon.svg.
-// Usage : npx electron scripts/make-icon.js
+// Génère build/icon.ico (multi-tailles) et build/icon.png à partir du logo vectoriel
+// assets/brand/logo-fond-clair.svg, centré dans un carré transparent.
+// Usage : npm run icon
 const fs = require('fs');
 const path = require('path');
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, nativeImage } = require('electron');
 
 const SIZES = [16, 24, 32, 48, 64, 128, 256];
+const MASTER = 512;
+const MARGIN = 0.03; // marge autour du logo, en fraction du côté
 const dir = path.join(__dirname, '..', 'build');
-const svg = fs.readFileSync(path.join(dir, 'icon.svg'), 'utf8');
+const SOURCE = path.join(__dirname, '..', 'assets', 'brand', 'logo-fond-clair.svg');
 
-// Rendu unique en 512 px, puis réduction pour chaque taille
+// Dessine le SVG dans un canvas (taille exacte, indépendante de l'échelle d'affichage)
 async function renderMaster() {
-  const size = 512;
-  const win = new BrowserWindow({
-    show: false, width: size, height: size, useContentSize: true, transparent: true, frame: false,
-    webPreferences: { offscreen: true },
-  });
-  win.webContents.setZoomFactor(1);
-  const html = `<html><body style="margin:0;background:transparent">
-    <img src="data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}" width="${size}" height="${size}" style="display:block"></body></html>`;
-  const file = path.join(app.getPath('temp'), 'custom-nav-icon.html');
-  fs.writeFileSync(file, html);
-  await win.loadFile(file);
-  await new Promise((r) => setTimeout(r, 500));
-  let img = await win.webContents.capturePage({ x: 0, y: 0, width: size, height: size });
-  if (img.getSize().width !== size) img = img.resize({ width: size, height: size, quality: 'best' });
+  const svg = fs.readFileSync(SOURCE, 'utf8');
+  const [, , vw, vh] = svg.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
+  const win = new BrowserWindow({ show: false, webPreferences: { offscreen: true } });
+  await win.loadURL('about:blank');
+  const dataUrl = await win.webContents.executeJavaScript(`new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const S = ${MASTER}, inner = S * (1 - 2 * ${MARGIN});
+      const k = Math.min(inner / ${vw}, inner / ${vh});
+      const w = ${vw} * k, h = ${vh} * k;
+      const c = document.createElement('canvas'); c.width = c.height = S;
+      const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+      resolve(c.toDataURL('image/png'));
+    };
+    img.onerror = () => reject(new Error('SVG illisible'));
+    img.src = 'data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}';
+  })`);
   win.destroy();
-  fs.unlinkSync(file);
-  return img;
+  return nativeImage.createFromDataURL(dataUrl);
 }
 
 // ICO dont chaque image est un PNG (format accepté depuis Windows Vista)

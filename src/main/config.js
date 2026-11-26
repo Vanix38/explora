@@ -3,11 +3,11 @@
 const settings = require('./settings');
 const search = require('./search');
 
-const HOME_PAGE = 'customnav://home/';
-const SETTINGS_PAGE = 'customnav://settings/';
-const HISTORY_PAGE = 'customnav://history/';
-const BOOKMARKS_PAGE = 'customnav://bookmarks/';
-const EXTENSIONS_PAGE = 'customnav://extensions/';
+const HOME_PAGE = 'explora://home/';
+const SETTINGS_PAGE = 'explora://settings/';
+const HISTORY_PAGE = 'explora://history/';
+const BOOKMARKS_PAGE = 'explora://bookmarks/';
+const EXTENSIONS_PAGE = 'explora://extensions/';
 
 const DEFAULT_FAVORITES = [
   { name: 'YouTube', url: 'https://www.youtube.com/' },

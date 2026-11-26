@@ -1,5 +1,5 @@
 // Page de réglages. Toutes les modifications passent par window.customNav
-// (exposé uniquement aux pages customnav://) et sont validées côté principal.
+// (exposé uniquement aux pages explora://) et sont validées côté principal.
 const api = window.customNav;
 const $ = (id) => document.getElementById(id);
 
@@ -495,9 +495,9 @@ function renderMcp(st) {
   $('mcp-enabled').checked = st.enabled;
   $('mcp-details').hidden = !st.enabled;
   $('mcp-url').textContent = st.url;
-  $('mcp-cmd-code').textContent = `claude mcp add --transport http custom-nav ${st.url} --header "Authorization: Bearer ${st.token}"`;
+  $('mcp-cmd-code').textContent = `claude mcp add --transport http explora ${st.url} --header "Authorization: Bearer ${st.token}"`;
   $('mcp-cmd-desktop').textContent = JSON.stringify({
-    'custom-nav': {
+    'explora': {
       command: 'npx',
       args: ['-y', 'mcp-remote', st.url, '--header', 'Authorization:${AUTH_HEADER}'],
       env: { AUTH_HEADER: `Bearer ${st.token}` },

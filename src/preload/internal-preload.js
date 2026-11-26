@@ -1,10 +1,10 @@
 // Preload des onglets. Il est chargé pour toutes les pages, mais n'expose
-// son API QUE sur les pages internes customnav:// : les sites web n'y ont
+// son API QUE sur les pages internes explora:// : les sites web n'y ont
 // pas accès. Le processus principal revérifie de toute façon l'origine de
 // chaque message (isInternalSender).
 const { contextBridge, ipcRenderer } = require('electron');
 
-if (location.protocol === 'customnav:') {
+if (location.protocol === 'explora:') {
   const call = (action, ...args) => ipcRenderer.invoke('internal', action, ...args);
 
   contextBridge.exposeInMainWorld('customNav', {
@@ -82,6 +82,11 @@ if (location.protocol === 'customnav:') {
       setAlways: (code, on) => call('translation-set-always', code, on),
       onChange: (cb) => ipcRenderer.on('internal:translation', (_e, s) => cb(s)),
     },
+    // client mail (page customnav://mail/ uniquement, revérifié côté principal)
+    mail: location.hostname === 'mail' ? {
+      call: (action, ...args) => ipcRenderer.invoke('mail', action, ...args),
+      onEvent: (cb) => ipcRenderer.on('internal:mail', (_e, ev) => cb(ev)),
+    } : undefined,
     onConfig: (cb) => ipcRenderer.on('internal:config', (_e, config) => cb(config)),
   });
 }

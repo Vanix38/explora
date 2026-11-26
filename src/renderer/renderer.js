@@ -57,7 +57,8 @@ function createTabEl(id) {
 function updateTabEl(t, tab) {
   const group = tab.groupId ? (state.groups || []).find((g) => g.id === tab.groupId) : null;
   t.el.className = 'tab' + (tab.id === state.activeId ? ' active' : '')
-    + (group ? ` grouped group-${group.color}` : '') + (group?.collapsed ? ' collapsed' : '');
+    + (group ? ` grouped group-${group.color}` : '') + (group?.collapsed ? ' collapsed' : '')
+    + (tab.splitPos ? ` split split-${tab.splitPos}` : '') + (tab.shown && tab.id !== state.activeId ? ' shown' : '');
   t.el.title = tab.title;
   t.title.textContent = tab.title || tab.url;
   const iconKey = tab.loading ? 'loading' : tab.favicon || '';
@@ -212,11 +213,13 @@ function render() {
 
   if (!addressDirty || document.activeElement !== address) {
     // la page d'accueil interne affiche une barre d'adresse vide
-    address.value = active && !active.url.startsWith('customnav://home') ? active.url : '';
+    address.value = active && !active.url.startsWith('explora://home') ? active.url : '';
     addressDirty = false;
   }
-  const appName = isPrivate ? 'Custom Nav (navigation privée)' : 'Custom Nav';
+  const appName = isPrivate ? 'Explora (navigation privée)' : 'Explora';
   document.title = active ? `${active.title} – ${appName}` : appName;
+  splitBtn.setAttribute('aria-pressed', String(!!state.split));
+  splitBtn.title = state.split ? "Fermer l'écran partagé (Ctrl+Shift+S)" : 'Écran partagé : ouvrir un onglet à côté (Ctrl+Shift+S)';
   renderStar(); // appelé après le chargement du script (événements IPC)
   renderAdblock();
   renderTranslate();
@@ -242,6 +245,49 @@ $('app-menu').addEventListener('click', () => {
   window.nav.appMenu(r.right, r.bottom);
 });
 $('extensions').addEventListener('click', () => window.nav.openExtensions());
+
+// --- Écran partagé ---
+// Les pages couvrent l'interface ; les séparateurs sont les bandes laissées
+// libres entre elles. Le glissement est suivi par le processus principal
+// (la souris passe au-dessus des pages pendant le déplacement).
+const splitBtn = $('split');
+const splitLayer = $('split-layer');
+splitBtn.addEventListener('click', () => window.nav.toggleSplit());
+
+function renderSplit(layout) {
+  splitLayer.hidden = !layout;
+  if (!layout) {
+    splitLayer.replaceChildren();
+    return;
+  }
+  const px = (el, r, grow = 0) => Object.assign(el.style, {
+    left: `${r.x - grow}px`, top: `${r.y - grow}px`, width: `${r.width + 2 * grow}px`, height: `${r.height + 2 * grow}px`,
+  });
+  const items = [];
+  const active = layout.panes.find((p) => p.active);
+  if (active) {
+    const ring = document.createElement('div');
+    ring.className = 'split-ring';
+    px(ring, active, layout.margin);
+    items.push(ring);
+  }
+  for (const d of layout.dividers) {
+    const el = document.createElement('div');
+    el.className = 'split-divider';
+    el.title = 'Glisser pour redimensionner · double-clic : parts égales';
+    px(el, d);
+    el.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      if (e.detail === 2) window.nav.splitReset();
+      else window.nav.splitResizeStart(d.index);
+    });
+    items.push(el);
+  }
+  splitLayer.replaceChildren(...items);
+}
+window.nav.onSplitLayout(renderSplit);
+window.nav.getSplitLayout().then(renderSplit);
 if (isPrivate) {
   // pas d'extensions en navigation privée
   $('extension-actions').remove();

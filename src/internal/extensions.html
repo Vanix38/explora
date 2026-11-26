@@ -18,7 +18,7 @@
         <button type="button" id="check-updates">Rechercher les mises à jour</button>
       </div>
       <p class="help">Sur le Chrome Web Store, le bouton <b>« Ajouter à Chrome »</b> installe l'extension dans
-        Custom Nav (une confirmation s'affiche avec ses autorisations). Ses boutons apparaissent à droite de la
+        Explora (une confirmation s'affiche avec ses autorisations). Ses boutons apparaissent à droite de la
         barre d'adresse. Les extensions sont mises à jour automatiquement au lancement puis toutes les 5 heures.</p>
       <div id="list"></div>
       <p class="status" id="status" role="status"></p>
@@ -26,7 +26,7 @@
 
     <section>
       <h2>Ce qui marche, et ce qui ne marche pas</h2>
-      <p class="help">Custom Nav est construit sur Electron, pas sur Chrome : le moteur de rendu est le même,
+      <p class="help">Explora est construit sur Electron, pas sur Chrome : le moteur de rendu est le même,
         mais une bonne partie des API d'extensions de Chrome n'existe pas ou n'est qu'imitée.</p>
       <ul class="compat">
         <li class="ok"><b>Fonctionnent en général</b> : les extensions qui modifient l'apparence ou le contenu
@@ -39,7 +39,7 @@
             <li>les <b>bloqueurs de publicité</b> récents (uBlock Origin Lite, AdGuard, AdBlock…) : ils
               reposent sur <code>declarativeNetRequest</code>, qu'Electron ne gère pas. Testé avec uBlock Origin
               Lite : il s'installe mais ne bloque rien. Utilise plutôt le <b>bloqueur intégré</b> (bouclier à droite
-              de la barre d'adresse, réglages dans <a href="customnav://settings/">Réglages</a>) ;</li>
+              de la barre d'adresse, réglages dans <a href="explora://settings/">Réglages</a>) ;</li>
             <li>la connexion avec un compte Google (<code>chrome.identity</code>), l'historique et les favoris de
               Chrome (<code>chrome.history</code>, <code>chrome.bookmarks</code>), les téléchargements, les
               captures d'onglet, le remplacement de la page Nouvel onglet ;</li>

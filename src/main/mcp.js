@@ -1,5 +1,5 @@
 // Serveur MCP (Model Context Protocol) : permet à une IA comme Claude (Claude
-// Code, Claude Desktop…) de piloter Custom Nav — lister / ouvrir / fermer des
+// Code, Claude Desktop…) de piloter Explora — lister / ouvrir / fermer des
 // onglets, naviguer, lire une page, chercher avec les moteurs configurés,
 // cliquer, écrire, faire une capture.
 //
@@ -80,12 +80,12 @@ const READ_PAGE = (maxChars, withLinks) => `(() => {
 })()`;
 
 function buildServer() {
-  const mcp = new McpServer({ name: 'custom-nav', version: '1.0.0' });
+  const mcp = new McpServer({ name: 'explora', version: '1.0.0' });
   const tabIdArg = z.number().int().optional().describe("Identifiant de l'onglet (list_tabs). Par défaut : l'onglet actif.");
 
   mcp.registerTool('list_tabs', {
     title: 'Lister les onglets',
-    description: 'Liste les onglets de la fenêtre normale de Custom Nav (id, titre, URL, onglet actif). Les fenêtres privées ne sont pas accessibles.',
+    description: 'Liste les onglets de la fenêtre normale de Explora (id, titre, URL, onglet actif). Les fenêtres privées ne sont pas accessibles.',
     annotations: { readOnlyHint: true },
   }, async () => {
     const ctx = api.getCtx();
@@ -94,7 +94,7 @@ function buildServer() {
 
   mcp.registerTool('list_engines', {
     title: 'Lister les moteurs et IA',
-    description: 'Liste les moteurs de recherche et IA configurés dans Custom Nav (utilisables avec search).',
+    description: 'Liste les moteurs de recherche et IA configurés dans Explora (utilisables avec search).',
     annotations: { readOnlyHint: true },
   }, async () => text(api.listEngines()));
 

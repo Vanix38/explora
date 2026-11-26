@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <!-- Les messages HTML s'affichent dans un iframe srcdoc bac à sable (sans
+       script ni formulaire) ; il hérite de cette politique, puis la restreint
+       encore (images distantes bloquées tant qu'on ne les demande pas). -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: https: http:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; frame-src 'self'; object-src 'none'; form-action 'none'" />
+  <title>Courrier</title>
+  <link rel="stylesheet" href="common.css" />
+  <link rel="stylesheet" href="mail.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Colonne de gauche : comptes et dossiers -->
+    <aside id="sidebar">
+      <div class="side-top">
+        <button type="button" id="compose" class="primary" title="Nouveau message (N)">✎ Nouveau message</button>
+      </div>
+      <nav id="folders" aria-label="Dossiers"></nav>
+      <div class="side-bottom">
+        <button type="button" id="refresh" class="icon" title="Relever le courrier (F5)" aria-label="Relever le courrier">&#8635;</button>
+        <button type="button" id="manage-accounts" title="Gérer les comptes">⚙ Comptes</button>
+      </div>
+    </aside>
+
+    <!-- Liste des messages -->
+    <section id="list-pane" aria-label="Messages">
+      <header class="list-top">
+        <input type="search" id="search" placeholder="Rechercher dans ce dossier…" aria-label="Rechercher dans ce dossier"
+               autocomplete="off" spellcheck="false" />
+      </header>
+      <div class="list-info" id="list-info"></div>
+      <div id="messages" role="listbox" tabindex="0" aria-label="Liste des messages"></div>
+      <div class="more-row"><button type="button" id="more" hidden>Charger plus</button></div>
+    </section>
+
+    <!-- Lecture -->
+    <section id="reader" aria-label="Lecture">
+      <div id="reader-empty" class="empty">
+        <p>Aucun message sélectionné</p>
+      </div>
+      <article id="message" hidden>
+        <header class="msg-head">
+          <div class="msg-actions">
+            <button type="button" id="reply" title="Répondre (R)">↩ Répondre</button>
+            <button type="button" id="reply-all" title="Répondre à tous (A)">↩↩ Tous</button>
+            <button type="button" id="forward" title="Transférer (F)">↪ Transférer</button>
+            <span class="spacer"></span>
+            <button type="button" id="toggle-star" class="icon" title="Suivre / étoile (S)" aria-label="Étoile">☆</button>
+            <button type="button" id="toggle-read" class="icon" title="Marquer comme non lu (U)" aria-label="Marquer comme non lu">✉</button>
+            <select id="move-to" aria-label="Déplacer vers" title="Déplacer vers…"></select>
+            <button type="button" id="delete" class="icon danger" title="Supprimer (Suppr)" aria-label="Supprimer">🗑</button>
+          </div>
+          <h2 id="msg-subject"></h2>
+          <div class="msg-meta">
+            <div><span class="label">De</span> <span id="msg-from"></span></div>
+            <div id="msg-to-row"><span class="label">À</span> <span id="msg-to"></span></div>
+            <div id="msg-cc-row"><span class="label">Cc</span> <span id="msg-cc"></span></div>
+            <div id="msg-date-row"><span class="label">Date</span> <span id="msg-date"></span></div>
+          </div>
+          <div id="remote-bar" class="notice" hidden>
+            Les images distantes ont été bloquées pour protéger ta vie privée.
+            <button type="button" id="show-remote">Afficher les images</button>
+          </div>
+          <div id="attachments" class="attachments" hidden></div>
+        </header>
+        <!-- bac à sable SANS allow-scripts : aucun script du message ne s'exécute
+             (allow-same-origin seul est sans danger et permet l'affichage) -->
+        <iframe id="msg-body" title="Contenu du message" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+      </article>
+    </section>
+  </div>
+
+  <!-- Rédaction -->
+  <div id="compose-panel" class="overlay" hidden>
+    <form id="compose-form" class="panel compose" autocomplete="off">
+      <header class="panel-head">
+        <h2 id="compose-title">Nouveau message</h2>
+        <button type="button" class="icon" id="compose-close" title="Fermer (Échap)" aria-label="Fermer">✕</button>
+      </header>
+      <div class="field"><label for="c-from">De</label><select id="c-from"></select></div>
+      <div class="field">
+        <label for="c-to">À</label><input type="text" id="c-to" placeholder="nom@exemple.fr, autre@exemple.fr" spellcheck="false" />
+        <button type="button" id="c-show-cc" class="link">Cc / Cci</button>
+      </div>
+      <div class="field" id="c-cc-row" hidden><label for="c-cc">Cc</label><input type="text" id="c-cc" spellcheck="false" /></div>
+      <div class="field" id="c-bcc-row" hidden><label for="c-bcc">Cci</label><input type="text" id="c-bcc" spellcheck="false" /></div>
+      <div class="field"><label for="c-subject">Objet</label><input type="text" id="c-subject" /></div>
+      <textarea id="c-body" aria-label="Message" spellcheck="true"></textarea>
+      <div id="c-attachments" class="attachments"></div>
+      <footer class="panel-foot">
+        <button type="submit" class="primary" id="c-send" title="Envoyer (Ctrl+Entrée)">Envoyer</button>
+        <button type="button" id="c-attach">📎 Joindre…</button>
+        <span class="status" id="c-status" role="status"></span>
+      </footer>
+    </form>
+  </div>
+
+  <!-- Comptes -->
+  <div id="accounts-panel" class="overlay" hidden>
+    <div class="panel accounts">
+      <header class="panel-head">
+        <h2>Comptes de messagerie</h2>
+        <button type="button" class="icon" id="accounts-close" title="Fermer (Échap)" aria-label="Fermer">✕</button>
+      </header>
+      <ul id="account-list"></ul>
+      <button type="button" id="account-add">+ Ajouter un compte</button>
+
+      <form id="account-form" hidden autocomplete="off">
+        <h3 id="account-form-title">Nouveau compte</h3>
+        <div class="field"><label for="a-name">Ton nom</label><input type="text" id="a-name" placeholder="Affiché aux destinataires" /></div>
+        <div class="field"><label for="a-email">Adresse mail</label><input type="text" id="a-email" spellcheck="false" placeholder="toi@exemple.fr" /></div>
+        <div class="field"><label for="a-password">Mot de passe</label><input type="password" id="a-password" /></div>
+        <p class="help" id="a-note" hidden></p>
+        <details id="a-advanced">
+          <summary>Serveurs (remplis automatiquement)</summary>
+          <div class="field"><label for="a-user">Identifiant</label><input type="text" id="a-user" spellcheck="false" placeholder="en général l'adresse mail" /></div>
+          <div class="server-row">
+            <span class="label">Réception IMAP</span>
+            <input type="text" id="a-imap-host" spellcheck="false" placeholder="imap.exemple.fr" aria-label="Serveur IMAP" />
+            <input type="number" id="a-imap-port" min="1" max="65535" aria-label="Port IMAP" />
+            <select id="a-imap-sec" aria-label="Chiffrement IMAP"><option value="ssl">SSL/TLS</option><option value="starttls">STARTTLS</option></select>
+          </div>
+          <div class="server-row">
+            <span class="label">Envoi SMTP</span>
+            <input type="text" id="a-smtp-host" spellcheck="false" placeholder="smtp.exemple.fr" aria-label="Serveur SMTP" />
+            <input type="number" id="a-smtp-port" min="1" max="65535" aria-label="Port SMTP" />
+            <select id="a-smtp-sec" aria-label="Chiffrement SMTP"><option value="ssl">SSL/TLS</option><option value="starttls">STARTTLS</option></select>
+          </div>
+        </details>
+        <div class="field"><label for="a-signature">Signature</label><textarea id="a-signature" rows="3"></textarea></div>
+        <label class="check"><input type="checkbox" id="a-notify" checked /> Me notifier des nouveaux messages</label>
+        <p class="help">Le mot de passe est chiffré par Windows et ne quitte jamais ton ordinateur, sauf vers ton serveur de messagerie.</p>
+        <div class="row">
+          <button type="submit" class="primary" id="a-save">Vérifier et enregistrer</button>
+          <button type="button" id="a-cancel">Annuler</button>
+          <span class="status" id="a-status" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" role="status" hidden></div>
+  <script src="mail.js"></script>
+</body>
+</html>
