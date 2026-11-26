@@ -11,6 +11,7 @@ const extensions = require('./extensions');
 const adblock = require('./adblock');
 const resend = require('./resend');
 const mcp = require('./mcp');
+const googleLogin = require('./google-login');
 
 const mail = require('./mail');
 
@@ -34,6 +35,8 @@ const APP_ICON = path.join(__dirname, '..', '..', 'build', 'icon.ico');
 app.userAgentFallback = app.userAgentFallback
   .replace(/\sElectron\/\S+/, '')
   .replace(/\sExplora\/\S+/gi, '');
+// Pages de connexion Google : user-agent Firefox (voir google-login.js).
+googleLogin.init();
 
 internal.registerScheme([resend.schemePrivileges]);
 
